@@ -8,16 +8,19 @@
 | 决策 | 选项 | 影响 |
 |---|---|---|
 | 仓库可见性 | `--public` / `--private` | 公开仓库等于发布，GPL-3.0 义务随之生效；私有的可以之后再开放 |
-| 仓库名 | 建议 `cenro` | 会出现在 clone URL 与 Release 链接里 |
+| 仓库名 | `Cenro`（与本地 `package.json` 的 name 对应；URL 大小写不敏感） | 会出现在 clone URL 与 Release 链接里 |
 
 ## 1. 登录（只需一次）
 
 ```bash
 gh auth login          # 选 GitHub.com → HTTPS → 浏览器授权
-gh auth status         # 确认账号
+gh auth status         # 确认账号与 scope：推送与建仓需要 `repo`
 ```
 
 如果不用 `gh`，也可以先在网页上建好空仓库，再 `git remote add origin <url>`。
+
+> **建仓时三个开关都别开**：README、`.gitignore`、license 一律选「不添加」。
+> 本地仓库这三样都有，网页上再生成一份会让首次 push 直接被拒（non-fast-forward）。
 
 ## 2. 建仓库并推送
 
@@ -25,10 +28,10 @@ gh auth status         # 确认账号
 cd F:/Project/Reader
 
 # 用 gh 一步到位（仓库已存在本地，所以用 --source .）
-gh repo create cenro --public --source . --remote origin --push
+gh repo create Cenro --public --source . --remote origin --push
 
-# 或者手动：
-# git remote add origin git@github.com:<账号>/cenro.git
+# 或者手动（仓库已在网页上建好时）：
+# git remote add origin https://github.com/Lumivox-wiz/Cenro.git
 # git push -u origin main
 ```
 
@@ -61,8 +64,9 @@ git tag -a v1.0.0 -m "岑序 1.0.0：首个正式版"
 git push origin v1.0.0
 ```
 
-推标签会触发 `.github/workflows/build.yml`：在 windows / ubuntu / macos 三平台跑 `tauri build`。
-**macOS 与 Linux 目前没有实跑过**，第一次大概率会在依赖或系统库上出问题，可以在 Actions 里按需关掉这两条。
+推标签会触发 `.github/workflows/build.yml`。**当前只跑 `windows-latest`**：
+macOS 与 Linux 从未在这台机器上跑通过，放开就是给每个 tag 挂两个红叉。
+矩阵里那两行已经写好、只是注释掉了，谁在对应系统上跑通一次，取消注释即可。
 
 ## 5. 发布 Release
 
