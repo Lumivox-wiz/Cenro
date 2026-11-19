@@ -222,6 +222,9 @@ JS 堆稳定在 30 MB 且无渐进泄漏，也免去三平台各带一份动态�
 
 **GNU General Public License v3.0 or later** · Copyright © 2026 Lumivox
 
+`LICENSE` 里是 GPL-3.0 的**原文**（不做任何增删，GitHub 才能正确识别）；
+「or later」与版权人信息写在这里和 `package.json` / `Cargo.toml` 的 `license` 字段里。
+
 可以自由使用、修改、分发，包括商用；但**分发修改版或二进制时必须提供完整源码**并沿用同一许可。
 软件按「现状」提供，不含任何担保——GPL 第 15、16 条对这一点有完整约定。
 
