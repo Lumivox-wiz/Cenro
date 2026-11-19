@@ -1,6 +1,6 @@
 [package]
 name = "cenro"
-version = "1.0.0"
+version = "1.0.1"
 description = "Local-first desktop reader for novels, comics and PDFs"
 authors = ["Lumivox"]
 license = "GPL-3.0-or-later"

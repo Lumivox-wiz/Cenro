@@ -1,6 +1,6 @@
 {
   "name": "cenro",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "本地优先的多格式阅读器：小说、漫画、PDF 收进同一个书架",
   "author": "Lumivox",
