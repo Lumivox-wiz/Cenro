@@ -10,8 +10,11 @@
 
 use serde::Serialize;
 
-/// 项目自身的许可：GPL-3.0 全文 + 前置 `or later` 声明。
+/// 项目自身的许可：GPL-3.0 **原文**。
+///
 /// 引用仓库根目录那一份，避免出现两份互相漂移的副本。
+/// 原文不带版权人与「or later」——那份声明放在下面的展示名与 README 里：
+/// LICENSE 一旦加上自定义前导，GitHub 的识别器就判不出许可证了（踩过）。
 const PROJECT: &str = include_str!("../../LICENSE");
 /// unrar-rs（CBR 解压）：Apache-2.0 + UnRAR 附加条款
 const UNRAR_RS: &str = include_str!("../resources/licenses/unrar-rs-LICENSE.txt");
@@ -28,7 +31,7 @@ pub struct LicenseText {
 pub fn license_texts() -> Vec<LicenseText> {
     vec![
         LicenseText {
-            name: "岑序 · GNU GPL v3.0 or later",
+            name: "岑序 · GNU GPL v3.0 or later · © 2026 Lumivox",
             body: PROJECT,
         },
         LicenseText {
