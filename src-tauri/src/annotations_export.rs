@@ -120,7 +120,7 @@ pub fn to_csv(items: &[Annotation]) -> String {
             }
         };
         // 锚点只有高亮 / 笔记才有；书签留空，单元格里不写 0 以免被误读成「第一个字」
-        let (anchor_start, anchor_len) = match item.anchor {
+        let (anchor_start, anchor_len) = match &item.anchor {
             Some(a) => (a.start.to_string(), a.len.to_string()),
             None => (String::new(), String::new()),
         };
@@ -207,7 +207,7 @@ pub fn to_json(book: &crate::models::Book, items: &[Annotation]) -> Result<Strin
                 locator: item.locator.clone(),
                 label: item.label.clone(),
                 excerpt: item.excerpt.clone(),
-                anchor: item.anchor,
+                anchor: item.anchor.clone(),
                 created_at: item.created_at,
                 updated_at: item.updated_at,
             })
@@ -268,7 +268,7 @@ mod tests {
             },
             label: Some("这句要记".into()),
             excerpt: Some("被划线的原文".into()),
-            anchor: Some(crate::models::Anchor { start: 12, len: 7 }),
+            anchor: Some(crate::models::Anchor::text(12, 7)),
             created_at: 1_700_000_000,
             updated_at: 1_700_000_000,
         }
@@ -335,7 +335,7 @@ mod tests {
 
         let item = &parsed.annotations[0];
         assert_eq!(item.kind, AnnotationKind::Highlight);
-        assert_eq!(item.anchor, Some(crate::models::Anchor { start: 12, len: 7 }));
+        assert_eq!(item.anchor, Some(crate::models::Anchor::text(12, 7)));
         assert_eq!(item.excerpt.as_deref(), Some("被划线的原文"));
         assert_eq!(item.created_at, 1_700_000_000);
         // 位置要能原样还原：回导靠的是它，不是「约 42%」

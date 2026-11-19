@@ -53,12 +53,12 @@ du -sh .git                                 # 正常在 50 MB 以内
 
 ## 4. 打一个版本标签
 
-版本号已在三处同步为 `0.21.0`（`package.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json`），
-`CHANGELOG.md` 的对应段落也已定稿。
+版本号已在三处同步为 `1.0.0`（`package.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json`），
+`CHANGELOG.md` 的 `[1.0.0]` 段落已定稿。
 
 ```bash
-git tag -a v0.21.0 -m "岑序 0.21.0：划词标注、PDF 文字层搜索、标签与批量导出"
-git push origin v0.21.0
+git tag -a v1.0.0 -m "岑序 1.0.0：首个正式版"
+git push origin v1.0.0
 ```
 
 推标签会触发 `.github/workflows/build.yml`：在 windows / ubuntu / macos 三平台跑 `tauri build`。
@@ -69,12 +69,12 @@ git push origin v0.21.0
 CI 跑出来的产物是工作流附件，不是 Release。要让人下载，需要单独建 Release：
 
 ```bash
-gh release create v0.21.0 \
-  release/Cenro_0.21.0_x64-setup.exe \
-  release/Cenro-0.21.0-win-x64-portable.exe \
-  release/Cenro-0.21.0-android-arm64.apk \
-  --title "岑序 0.21.0" \
-  --notes-file <(sed -n '/## \[0.21.0\]/,/## \[0.20.9\]/p' CHANGELOG.md | head -n -1)
+gh release create v1.0.0 \
+  release/Cenro_1.0.0_x64-setup.exe \
+  release/Cenro-1.0.0-win-x64-portable.exe \
+  release/Cenro-1.0.0-android-arm64.apk \
+  --title "岑序 1.0.0" \
+  --notes-file <(sed -n '/## \[1.0.0\]/,/^## 关于版本号/p' CHANGELOG.md | head -n -2)
 ```
 
 （`<(...)` 是 bash 的进程替换；在 PowerShell 里先 `git tag` 再手动粘贴 notes。）

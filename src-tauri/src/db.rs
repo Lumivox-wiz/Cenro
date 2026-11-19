@@ -799,7 +799,7 @@ pub fn insert_annotation(conn: &Connection, item: &Annotation) -> Result<()> {
             serde_json::to_string(&item.locator)?,
             item.label,
             item.excerpt,
-            item.anchor.map(|a| serde_json::to_string(&a)).transpose()?,
+            item.anchor.as_ref().map(serde_json::to_string).transpose()?,
             item.created_at,
             item.updated_at
         ],

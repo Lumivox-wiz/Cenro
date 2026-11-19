@@ -1,3 +1,5 @@
+import type { Anchor } from "../api";
+
 /**
  * 划词标注的坐标换算与绘制。
  *
@@ -14,12 +16,14 @@
  * 会校验区间里取出来的文字与 `excerpt` 是否一致，不一致就不画。
  */
 
-export interface Anchor {
-  /** 章内起始字符下标 */
-  start: number;
-  /** 区间长度（码元数） */
-  len: number;
-}
+/*
+ * 锚点类型只有一个来源：`api.ts`。
+ *
+ * 这里曾经自己定义了一份一模一样的 `Anchor`，结果是给 PDF 加
+ * 「页码 + 归一化矩形」时两边分叉，类型对不上。共用一份之后，
+ * 文本类格式照样只填 start / len，PDF 多填 page / rects。
+ */
+export type { Anchor };
 
 export interface MarkSpec {
   id: string;

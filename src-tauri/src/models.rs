@@ -268,10 +268,25 @@ pub struct Annotation {
 /// EPUB 是 href），而「章里第几个字到第几个字」在所有文本格式上是同一件事。
 /// 单位取 UTF-16 码元是因为它和 JS 字符串下标、DOM `Range` 偏移完全一致——
 /// 前端量出来多少就存多少，画回去也不用换算。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Anchor {
+    /// 章内字符起点（UTF-16 码元）。PDF 的框选没有字符偏移，两项都为 0
     pub start: u32,
     pub len: u32,
+    /// PDF 专用：0 基页码
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page: Option<u32>,
+    /// PDF 专用：相对页面尺寸的归一化矩形 `[x0, y0, x1, y1]`，取值 0–1。
+    /// 存归一化值而不是像素，缩放、改窗口大小、切单双页都不用重算。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rects: Option<Vec<[f32; 4]>>,
+}
+
+impl Anchor {
+    /// 文本类格式用：章内字符区间
+    pub fn text(start: u32, len: u32) -> Self {
+        Self { start, len, page: None, rects: None }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

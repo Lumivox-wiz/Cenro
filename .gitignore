@@ -52,3 +52,23 @@ now-light.png
 
 # pdf.js 的 CMap / 字体 / wasm：由 `npm run prebuild` 从 node_modules 同步，不入库
 public/pdfjs/
+
+# 研发过程文档：规范化设计、审计、差距复核与调研资料。留在本地，不随仓库公开
+docs/BLUEPRINT.md
+docs/UI_SPEC.md
+docs/UX_SPEC.md
+docs/SPEC_AUDIT.md
+docs/GAP_ANALYSIS.md
+docs/SIMPLIFICATION_PLAN.md
+docs/DOC_CONFLICT_AUDIT.md
+docs/DOC_CONFLICT_VERIFY.md
+docs/UI_REVIEW.md
+docs/UI_TRANSLUCENCE_PLAN.md
+docs/IMPLEMENTATION_NOTES.md
+docs/FORMAT_RESEARCH.md
+docs/KOODO_FORMAT_NOTES.md
+docs/KOOKIT_REA_ANALYSIS.md
+docs/KOOKIT_SYMBOLS.md
+docs/PROMO_KIT.md
+docs/CHANGELOG-0.x.md
+docs/archive/

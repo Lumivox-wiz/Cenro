@@ -224,10 +224,18 @@ export interface RemoteBackup {
 
 export type AnnotationKind = "bookmark" | "highlight" | "note";
 
-/** 章内字符区间，单位 UTF-16 码元（与 JS 字符串下标一致） */
+/**
+ * 标注锚点。两种语义共用一份结构：
+ * - 文本类（TXT / HTML / EPUB）：章内字符区间，单位 UTF-16 码元，与 JS 字符串下标一致；
+ * - PDF：没有可靠的字符偏移，改存「哪一页 + 若干归一化矩形」，缩放与改窗口都不用重算。
+ */
 export interface Anchor {
   start: number;
   len: number;
+  /** PDF：0 基页码 */
+  page?: number | null;
+  /** PDF：相对页面尺寸的矩形 `[x0, y0, x1, y1]`，取值 0–1 */
+  rects?: [number, number, number, number][] | null;
 }
 
 export interface Annotation {

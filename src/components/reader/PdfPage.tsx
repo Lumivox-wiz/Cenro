@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { logError } from "../../lib/log";
+import type { AnnotationKind } from "../../api";
+
+/** 画在页面上的一条标注：矩形已是归一化值（0–1），与缩放无关 */
+export interface PageHighlight {
+  id: string;
+  kind: AnnotationKind;
+  rects: [number, number, number, number][];
+}
 
 interface Props {
   doc: PDFDocumentProxy;
@@ -11,6 +19,8 @@ interface Props {
   /** 滚动模式下进入视口才渲染 */
   lazy?: boolean;
   onVisible?: (index: number) => void;
+  /** 这一页上的划线 / 批注 */
+  highlights?: PageHighlight[];
 }
 
 /**
@@ -24,9 +34,11 @@ export default function PdfPage({
   rotation,
   lazy = false,
   onVisible,
+  highlights,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const textRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(!lazy);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
 
@@ -77,6 +89,28 @@ export default function PdfPage({
         const renderTask = page.render({ canvas, viewport: hiRes });
         task = renderTask;
         await renderTask.promise;
+        if (cancelled) return;
+
+        /*
+         * 文本层：透明文字叠在 canvas 上，只为「能选」。
+         *
+         * 没有它，PDF 里选不了字，也就没法划线——pdf.js 自己不做选择，
+         * 它只把每段文字的位置算好塞进 DOM，选中与取矩形交给浏览器。
+         * 这层必须与 canvas 同尺寸同位置，否则选出来的框会偏。
+         */
+        const container = textRef.current;
+        if (container) {
+          const textContent = await page.getTextContent();
+          if (cancelled) return;
+          container.replaceChildren();
+          // 文本层的尺寸与字号都由这几个变量算出来（见 reader.css 的说明）
+          container.style.setProperty("--total-scale-factor", String(viewport.scale));
+          container.style.setProperty("--scale-round-x", "1px");
+          container.style.setProperty("--scale-round-y", "1px");
+          const { TextLayer } = await import("pdfjs-dist");
+          const layer = new TextLayer({ textContentSource: textContent, container, viewport });
+          await layer.render();
+        }
         page.cleanup();
       } catch (e) {
         if (!(e instanceof Error) || !/cancel/i.test(e.message)) {
@@ -97,10 +131,32 @@ export default function PdfPage({
     <div
       className="pdf-page"
       ref={wrapRef}
+      data-page={index}
       style={size ? { width: `${size.w}px`, height: `${size.h}px` } : undefined}
     >
       {visible ? (
-        <canvas ref={canvasRef} className="pdf-canvas" />
+        <>
+          <canvas ref={canvasRef} className="pdf-canvas" />
+          <div className="pdf-text-layer" ref={textRef} />
+          {highlights && highlights.length > 0 && (
+            <div className="pdf-hl-layer" aria-hidden="true">
+              {highlights.flatMap((item) =>
+                item.rects.map((r, i) => (
+                  <span
+                    key={`${item.id}-${i}`}
+                    className={`pdf-hl pdf-hl-${item.kind}`}
+                    style={{
+                      left: `${r[0] * 100}%`,
+                      top: `${r[1] * 100}%`,
+                      width: `${Math.max(0, r[2] - r[0]) * 100}%`,
+                      height: `${Math.max(0, r[3] - r[1]) * 100}%`,
+                    }}
+                  />
+                )),
+              )}
+            </div>
+          )}
+        </>
       ) : (
         <div className="pdf-page-placeholder" />
       )}

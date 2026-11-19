@@ -1241,7 +1241,7 @@ fn import_into(
         // 书签没有锚点，别把文件里的脏数据带进来
         let anchor = match item.kind {
             AnnotationKind::Bookmark => None,
-            _ => item.anchor,
+            _ => item.anchor.clone(),
         };
         let candidate = Annotation {
             id: crate::util::new_id(),
@@ -1976,7 +1976,7 @@ mod annotation_dedupe_tests {
             locator: Progress::Text { offset: 100, chapter: 1, total: 1000 },
             label: label.map(|s| s.to_string()),
             excerpt: Some("原文".into()),
-            anchor: Some(Anchor { start, len: 4 }),
+            anchor: Some(Anchor::text(start, 4)),
             created_at: 1,
             updated_at: 1,
         }
@@ -2027,7 +2027,7 @@ mod annotation_dedupe_tests {
                     locator: Progress::Text { offset: 100, chapter: 1, total: 1000 },
                     label: Some("第一条".into()),
                     excerpt: Some("原文".into()),
-                    anchor: Some(Anchor { start: 10, len: 4 }),
+                    anchor: Some(Anchor::text(10, 4)),
                     created_at: 1_700_000_000,
                     updated_at: 1_700_000_000,
                 },

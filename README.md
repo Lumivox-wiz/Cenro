@@ -4,7 +4,7 @@
 
 不联网、不要账号、不推书。书是你的文件，阅读记录是本机的一个 SQLite 文件。
 
-Windows 与 Android 都有可安装构建 · [GPL-3.0-or-later](LICENSE) · Tauri 2 + React 19
+**v1.0.0**（2026-11-19）· Windows 与 Android 都有可安装构建 · [GPL-3.0-or-later](LICENSE) · Tauri 2 + React 19
 
 ![书架](docs/screenshots/shelf.png)
 
@@ -72,9 +72,10 @@ MOBI 与 ZIP 按内容判定：图片记录 ≥ 3 条走漫画阅读器，否则
 ## 标注
 
 - **书签**：覆盖全部格式，可重命名、按位置 / 时间排序、同位置去重、删除后 6 秒内撤销
-- **划词高亮与笔记**：选中正文即浮出「高亮 / 笔记」（TXT / HTML / EPUB）。
+- **划词高亮与笔记**：选中正文即浮出「高亮 / 笔记」，覆盖 **TXT / HTML / EPUB / PDF**。
   锚点存「章内字符区间」，改字号、行高、字体、分页或滚动都不会漂；
-  绘制前用原文校验，书换了内容就宁可不画，不会把线画到别的句子上
+  绘制前用原文校验，书换了内容就宁可不画，不会把线画到别的句子上；
+  PDF 存的是「页码 + 归一化矩形」，缩放、改窗口、切单双页都不会画偏（扫描件没有文本层，选不了字）
 - 面板按类型筛选（全部 / 书签 / 高亮 / 笔记），点一条**精确翻到划线所在页**；点正文里的划线可回看笔记
 - **导出** Markdown / CSV / JSON：前者给人看（引用块 = 书里原话，正文段 = 你写的），
   JSON 存的是库里的原值，可以**导回来**；导入按「类型 + 位置 + 锚点 + 备注 + 原文」去重
@@ -197,29 +198,14 @@ System WebView」，并带一个按钮直达商店详情页。读不到版本号
 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--disable-gpu` 后再启动，绕过合成层。
 它只对本次进程生效，不改系统设置、不写注册表。
 
-## 已知限制
-
-- **扫描件 PDF 与漫画不能搜索**：没有文字层，要搜得引入 OCR
-- **隐私书架不加密**：文件与进度仍在磁盘上，`id` 由路径哈希而来
-- **EPUB 进度用 `href + progression`**，改字号或行高后回到同一章会有几行漂移
-- **Markdown 只做纯文本化**；**HTML 是受限富文本**（脚本不执行，外链样式与图片不加载）
-- **书架未做虚拟滚动**，超过 200 本才有感知
-- **macOS / Linux 未验证**：CI 工作流已配好，但没有实际跑过，也没有签名与公证
-- **文件关联不注册 `.zip`**：压缩包被各种软件共用，接管会打断别的工具
-- 更多见 [docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md) —— 与同类产品逐项对比，包括我们没做的部分
-
 ## 文档
 
 | 文件 | 作用 |
 |---|---|
-| [docs/BLUEPRINT.md](docs/BLUEPRINT.md) | 技术蓝图：数据模型、格式引擎选型与实测性能 |
-| [docs/UI_SPEC.md](docs/UI_SPEC.md) | 视觉规范：Token、组件状态、验收清单 |
-| [docs/UX_SPEC.md](docs/UX_SPEC.md) | 交互规范：任务流、异常恢复、键盘与焦点 |
-| [docs/SPEC_AUDIT.md](docs/SPEC_AUDIT.md) | 与规范的对照审计（含偏离原因） |
-| [docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md) | 能力差距复核与剩余清单 |
 | [CHANGELOG.md](CHANGELOG.md) | 更新日志与版本策略 |
+| [docs/GITHUB.md](docs/GITHUB.md) | 打标签、发 Release、哪些路径不能进仓库 |
 
-规范要求「未覆盖的场景先登记再实现」，所以凡是与规范不一致的地方都写在审计文件里，不静默发挥。
+研发过程的规范、审计与差距复核属于内部资料，不随仓库发布。
 
 ## 技术栈
 
@@ -230,7 +216,7 @@ Tauri 2 · React 19 · TypeScript · Vite。Rust 负责扫描、解压、封面�
 `argon2`、`tauri-plugin-single-instance`。
 
 选 pdf.js 而不是 pdfium，依据是实测：720 页 / 103 MB 扫描件首屏 995 ms、单页渲染 7–13 ms、
-JS 堆稳定在 30 MB 且无渐进泄漏，也免去三平台各带一份动态库的成本（见 `docs/BLUEPRINT.md` §6）。
+JS 堆稳定在 30 MB 且无渐进泄漏，也免去三平台各带一份动态库的成本。
 
 ## 许可
 

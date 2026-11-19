@@ -241,8 +241,8 @@ export default function OfdViewer({ book, onExit, onProgress }: Props) {
         <button
           className="reader-toolbar-btn"
           onClick={() => setExtras("annotation")}
-          aria-label="书签"
-          title="书签"
+          aria-label="标注"
+          title="书签与标注"
         >
           <Bookmark size={20} strokeWidth={2} />
         </button>

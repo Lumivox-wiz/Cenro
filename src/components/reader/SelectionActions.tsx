@@ -10,6 +10,11 @@ interface Props {
   enabled: boolean;
   /** 落库中：按钮先置灰，避免连点出两条一样的标注 */
   busy?: boolean;
+  /**
+   * 自定义选区解释器。默认按「章内字符偏移」算锚点（文本类格式）；
+   * PDF 没有这层偏移，改存页码 + 归一化矩形，由调用方给一份实现。
+   */
+  resolve?: (root: HTMLElement) => SelectionTarget | null;
   onCreate: (kind: "highlight" | "note", target: SelectionTarget, note: string | null) => void;
 }
 
@@ -23,13 +28,15 @@ interface Props {
  * 不接管「选中」这个动作本身：浏览器原生的长按选词、拖选、双击选词
  * 都比自己实现的好用，尤其在有系统选择手柄的移动端。
  */
-export default function SelectionActions({ getRoot, enabled, busy, onCreate }: Props) {
+export default function SelectionActions({ getRoot, enabled, busy, resolve, onCreate }: Props) {
   const [target, setTarget] = useState<SelectionTarget | null>(null);
   const [noteMode, setNoteMode] = useState(false);
   const [draft, setDraft] = useState("");
   // 调用方通常内联传 getRoot（每次渲染都是新函数），存进 ref 才不会反复重挂监听
   const rootOf = useRef(getRoot);
   rootOf.current = getRoot;
+  const resolveOf = useRef(resolve);
+  resolveOf.current = resolve;
   const cardRef = useRef<HTMLDivElement>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const timer = useRef<number | undefined>(undefined);
@@ -49,7 +56,7 @@ export default function SelectionActions({ getRoot, enabled, busy, onCreate }: P
       timer.current = window.setTimeout(() => {
         const root = rootOf.current();
         if (!root) return;
-        const next = readSelection(root);
+        const next = (resolveOf.current ?? readSelection)(root);
         // 选到正文外（工具栏、输入框）就当没选
         setTarget(next);
       }, 140);

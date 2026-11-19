@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
-import type { SearchHit } from "../../api";
+import type { Annotation, Anchor, SearchHit } from "../../api";
 import {
   ArrowLeft,
   Bookmark,
@@ -15,7 +15,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { errorText, fileUrl } from "../../api";
+import { annotationApi, errorText, fileUrl } from "../../api";
 import type { Book, Progress, SpreadMode } from "../../types";
 import ReaderExtras, { type ExtrasTab } from "./ReaderExtras";
 import { extractFlatText, findInPage, type PageText } from "../../lib/pdfText";
@@ -23,10 +23,72 @@ import type { SpreadModePref } from "../../lib/prefs";
 import { focusChromeBand } from "../../lib/a11y";
 import { useAnnounce } from "../../lib/useAnnounce";
 import { useFocusTrap } from "../../lib/useFocusTrap";
-import PdfPage from "./PdfPage";
+import PdfPage, { type PageHighlight } from "./PdfPage";
+import SelectionActions from "./SelectionActions";
+import { logError } from "../../lib/log";
+import type { SelectionTarget } from "../../lib/highlight";
 import ShortcutHelp, { type HelpSection } from "./ShortcutHelp";
 
 type PdfjsModule = typeof import("pdfjs-dist");
+
+/**
+ * PDF 的选区怎么变成锚点。
+ *
+ * 文本类格式用的是「章内第几个字到第几个字」，PDF 没有这层偏移：
+ * pdf.js 的文本层是绝对定位的 span，字符顺序与视觉顺序不一定一致。
+ * 所以这里存**哪一页 + 若干归一化矩形**：矩形按页面尺寸折算到 0–1，
+ * 换缩放、换窗口宽度、切单双页都不需要重算，也不会画偏。
+ *
+ * 跨页选择只取**起点所在页**的矩形：一条标注挂两页会让「跳转」「导出」
+ * 都变得没法解释，不如把跨页这件事交给用户自己分两次选。
+ */
+function readPdfSelection(root: HTMLElement): SelectionTarget | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+  const range = selection.getRangeAt(0);
+  if (!root.contains(range.commonAncestorContainer)) return null;
+
+  const text = selection.toString().replace(/\s+/g, " ").trim();
+  if (!text) return null;
+
+  const startNode = range.startContainer;
+  const startEl =
+    startNode.nodeType === Node.ELEMENT_NODE
+      ? (startNode as Element)
+      : startNode.parentElement;
+  const pageEl = startEl?.closest<HTMLElement>(".pdf-page");
+  if (!pageEl) return null;
+
+  const pageIndex = Number(pageEl.dataset.page);
+  if (!Number.isFinite(pageIndex)) return null;
+
+  const box = pageEl.getBoundingClientRect();
+  if (box.width <= 0 || box.height <= 0) return null;
+
+  const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+  const rects: [number, number, number, number][] = [];
+  let first: DOMRect | null = null;
+
+  for (const r of Array.from(range.getClientRects())) {
+    if (r.width < 1 || r.height < 1) continue;
+    // 只要落在这页里的；跨页的其余部分丢掉
+    if (r.bottom < box.top - 2 || r.top > box.bottom + 2) continue;
+    if (!first) first = r;
+    rects.push([
+      clamp01((r.left - box.left) / box.width),
+      clamp01((r.top - box.top) / box.height),
+      clamp01((r.right - box.left) / box.width),
+      clamp01((r.bottom - box.top) / box.height),
+    ]);
+  }
+  if (!first || rects.length === 0) return null;
+
+  return {
+    anchor: { start: 0, len: 0, page: pageIndex, rects },
+    text: text.slice(0, 300),
+    rect: { left: first.left, top: first.top, right: first.right, bottom: first.bottom },
+  };
+}
 
 /*
  * pdf.js 的运行时资源，缺任何一样都表现为「整页空白」：
@@ -386,6 +448,61 @@ export default function PdfViewer({
     [doc, fitWidth, mode, spread, zoom],
   );
 
+  const [marks, setMarks] = useState<Annotation[]>([]);
+  const [markBusy, setMarkBusy] = useState(false);
+  const [markNotice, setMarkNotice] = useState<string | null>(null);
+
+  const loadMarks = useCallback(async () => {
+    try {
+      setMarks(await annotationApi.list(book.id));
+    } catch (e) {
+      logError(`读取 PDF 标注失败：${errorText(e)}`);
+    }
+  }, [book.id]);
+
+  useEffect(() => {
+    void loadMarks();
+  }, [loadMarks]);
+
+  /** 这一页上要画的标注；没有就返回 undefined，免得每页都建一个空数组 */
+  const highlightsFor = useCallback(
+    (pageIndex: number): PageHighlight[] | undefined => {
+      const list: PageHighlight[] = [];
+      for (const item of marks) {
+        if (item.kind === "bookmark") continue;
+        const rects = item.anchor?.rects;
+        if (!rects || item.anchor?.page !== pageIndex) continue;
+        list.push({ id: item.id, kind: item.kind, rects });
+      }
+      return list.length > 0 ? list : undefined;
+    },
+    [marks],
+  );
+
+  const createMark = useCallback(
+    async (kind: "highlight" | "note", target: SelectionTarget, note: string | null) => {
+      const anchor: Anchor = target.anchor;
+      const pageIndex = anchor.page ?? Math.max(0, page - 1);
+      setMarkBusy(true);
+      try {
+        await annotationApi.add(
+          book.id,
+          kind,
+          { kind: "paged", page: pageIndex, total: pageCount, zoom: fitWidth ? 1 : zoom, spread },
+          { label: note, excerpt: target.text, anchor },
+        );
+        await loadMarks();
+        setMarkNotice(kind === "note" ? "笔记已保存" : "已划线");
+        window.setTimeout(() => setMarkNotice(null), 2400);
+      } catch (e) {
+        setMarkNotice(errorText(e));
+      } finally {
+        setMarkBusy(false);
+      }
+    },
+    [book.id, fitWidth, loadMarks, page, pageCount, spread, zoom],
+  );
+
   const currentLocator = useCallback(
     () => ({
       kind: "paged" as const,
@@ -606,8 +723,8 @@ export default function PdfViewer({
         <button
           className="reader-toolbar-btn"
           onClick={() => setExtras("annotation")}
-          aria-label="书签"
-          title="书签"
+          aria-label="标注"
+          title="书签与标注"
         >
           <Bookmark size={20} strokeWidth={2} />
         </button>
@@ -654,6 +771,7 @@ export default function PdfViewer({
                   index={p - 1}
                   scale={scale}
                   rotation={rotation}
+                  highlights={highlightsFor(p - 1)}
                 />
               ))}
             </div>
@@ -688,6 +806,7 @@ export default function PdfViewer({
                         rotation={rotation}
                         lazy
                         onVisible={handleVisible}
+                        highlights={highlightsFor(i)}
                       />
                     ))}
                   </div>
@@ -859,7 +978,23 @@ export default function PdfViewer({
           onSearch={searchPdf}
           searchEmptyHint="如果这份 PDF 是扫描件（每页是图片），就没有文字层，换个文字版才能搜。"
           orderOf={(loc) => (loc.kind === "paged" ? loc.page : null)}
+          onChanged={() => void loadMarks()}
         />
+      )}
+
+      {/* 划词浮条与提示：PDF 用自己那套选区解释器，其余与文字书共用同一个组件 */}
+      <SelectionActions
+        getRoot={() => stageRef.current}
+        enabled={!error && !!doc}
+        busy={markBusy}
+        resolve={readPdfSelection}
+        onCreate={(kind, target, note) => void createMark(kind, target, note)}
+      />
+
+      {markNotice && (
+        <p className="reader-toast" role="status">
+          {markNotice}
+        </p>
       )}
     </div>
   );

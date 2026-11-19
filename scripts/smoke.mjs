@@ -194,6 +194,25 @@ const SCRIPT = String.raw`(async () => {
   );
   await back();
 
+  // ---- PDF 标注：选中文本层的一段字，划一条线 ----
+  await open("建筑十书");
+  const pdfSpan = document.querySelector(".pdf-text-layer span");
+  if (pdfSpan && pdfSpan.firstChild) {
+    const range = document.createRange();
+    range.setStart(pdfSpan.firstChild, 0);
+    range.setEnd(pdfSpan.firstChild, Math.min(6, pdfSpan.firstChild.length));
+    const s2 = window.getSelection();
+    s2.removeAllRanges();
+    s2.addRange(range);
+    document.dispatchEvent(new Event("selectionchange"));
+    await sleep(450);
+    [...document.querySelectorAll(".sel-bar .sel-btn")].find((b) => b.textContent.includes("高亮"))?.click();
+    await sleep(900);
+  }
+  check("PDF 文本层", !!pdfSpan, "可选中的文字层");
+  check("PDF 划词落库", document.querySelectorAll(".pdf-hl").length > 0, "页内划线");
+  await back();
+
   // ---- 标签 ----
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
   const card = document.querySelectorAll(".book-card")[0];

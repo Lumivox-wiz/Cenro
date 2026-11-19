@@ -896,6 +896,83 @@
 .pdf-page {
   flex: 0 0 auto;
   background: #ffffff;
+  /* 文本层与划线层都按这个盒子做绝对定位 */
+  position: relative;
+}
+
+/* ---------------- PDF 文本层（只为「能选」，不可见） ---------------- */
+
+/*
+ * pdf.js 把每段文字算成绝对定位的 span 塞进来，字是透明的——
+ * 用户看到的是 canvas，选中的却是这一层，于是「选字 / 划线」跟网页正文一样自然。
+ * 尺寸与 canvas 严格一致，否则选出来的矩形会偏移。
+ */
+.pdf-text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: transparent;
+  z-index: 2;
+
+  /*
+   * 这三行是抄 pdf.js 官方样式表的，不是可选项。
+   *
+   * pdf.js v6 的文本层不在 JS 里算字号：它给每个 span 写入 `--font-height`、
+   * `--scale-x`、`--rotate` 三个自定义属性，真正的 `font-size` 与 `transform`
+   * 由样式表算出来。少了这段，span 会用继承来的 14px 默认字号——
+   * 选区矩形比实际文字窄一截，划线就会短一块（踩过）。
+   */
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.pdf-text-layer > :not(.markedContent),
+.pdf-text-layer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+  /*
+   * 直接用 `--font-height`，不再乘 --total-scale-factor。
+   * pdf.js v6 写进来的 `--font-height` 已经是**缩放后**的像素高度
+   * （22px 的标题在 1.64 倍下写的是 22px，不是 13.4px），再乘一次就变成 36px：
+   * 选区比正文大一圈，划线跟着错位。--total-scale-factor 只留给容器尺寸用。
+   */
+  --font-height: 0;
+  font-size: var(--font-height);
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.pdf-text-layer ::selection {
+  background: rgba(64, 140, 255, 0.28);
+}
+
+.pdf-hl {
+  position: absolute;
+  border-radius: 2px;
+}
+
+/* 与文字书的 mark.hl 同一套配色：下半条荧光带，不是整块铺满 */
+.pdf-hl-highlight {
+  background: linear-gradient(transparent 45%, rgba(255, 205, 74, 0.55) 45%);
+}
+
+.pdf-hl-note {
+  background: linear-gradient(transparent 45%, rgba(120, 200, 255, 0.5) 45%);
+  border-bottom: 1px dashed rgba(120, 200, 255, 0.9);
 }
 
 .pdf-page canvas {
