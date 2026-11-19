@@ -256,6 +256,8 @@ export default function PdfViewer({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  /** 舞台上的按下点：用来区分「单击」与「拖选 / 长按」 */
+  const downPoint = useRef<{ x: number; y: number; t: number } | null>(null);
 
   // 打开文档
   useEffect(() => {
@@ -544,6 +546,53 @@ export default function PdfViewer({
     [mode, columnsPerView, pageCount],
   );
 
+  /**
+   * 单击翻页。
+   *
+   * 1.0 给 PDF 铺了 pdf.js 文本层（z-index 2、盖满整页）之后，原来那两条落在
+   * z-index 1 的透明热区就点不到了——点正文全被透明文字接走，表现就是「点左右不翻页」。
+   * 现在改成按点击位置分区：左 25% 上一页、右 25% 下一页，中间不动
+   * （PDF 中间那一下多半是用来取消选区或看图，不该跳）。
+   *
+   * 三条守卫缺一不可，否则会误触：
+   * - 落点在工具栏/抽屉上不算；
+   * - 按下到抬起移动超过 8px、或超过 250ms 不算（那是拖选 / 长按）；
+   * - 当前存在选区时只取消选择、不翻页，不然「点一下取消选中」会顺带跳页。
+   */
+  const handleStagePointerDown = useCallback((e: React.PointerEvent) => {
+    downPoint.current = { x: e.clientX, y: e.clientY, t: Date.now() };
+  }, []);
+
+  const handleStageClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (mode !== "paged") return;
+      const target = e.target as HTMLElement;
+      if (target.closest(".reader-topbar, .reader-bottombar, .toc")) return;
+
+      const down = downPoint.current;
+      downPoint.current = null;
+      if (down) {
+        if (Math.abs(e.clientX - down.x) > 8 || Math.abs(e.clientY - down.y) > 8) return;
+        if (Date.now() - down.t > 250) return;
+      }
+
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed) {
+        selection.removeAllRanges();
+        return;
+      }
+
+      const stage = stageRef.current;
+      if (!stage) return;
+      const box = stage.getBoundingClientRect();
+      if (box.width <= 0) return;
+      const ratio = (e.clientX - box.left) / box.width;
+      if (ratio < 0.25) go(-1);
+      else if (ratio > 0.75) go(1);
+    },
+    [go, mode],
+  );
+
   const zoomBy = (dir: 1 | -1) => {
     const current = fitWidth ? 1 : zoom;
     const index = ZOOM_STEPS.findIndex((z) => z >= current - 0.001);
@@ -748,7 +797,12 @@ export default function PdfViewer({
         </button>
       </div>
 
-      <div className="reader-stage pdf-stage" ref={stageRef}>
+      <div
+        className="reader-stage pdf-stage"
+        ref={stageRef}
+        onPointerDown={handleStagePointerDown}
+        onClick={handleStageClick}
+      >
         {error ? (
           <div className="reader-notice">
             <div className="reader-notice-title">PDF 打开失败</div>
@@ -774,15 +828,6 @@ export default function PdfViewer({
                   highlights={highlightsFor(p - 1)}
                 />
               ))}
-            </div>
-
-            {/*
-             * 左右点击翻页。只盖住两侧各 14%，中间留给阅读与右键菜单；
-             * 滚动模式下不出现——那里点一下不该跳页。
-             */}
-            <div className="pdf-tap-layer">
-              <button className="pdf-tap" onClick={() => go(-1)} aria-label="上一页" tabIndex={-1} />
-              <button className="pdf-tap" onClick={() => go(1)} aria-label="下一页" tabIndex={-1} />
             </div>
           </>
         ) : (

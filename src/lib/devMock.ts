@@ -28,7 +28,7 @@ function makeBooks(): Book[] {
     ["夜航船·校注本", "doc", "docx", "张岱", 12, null],
     ["読切短編集 2019", "comic", "cbz", "なつめ", 88, { kind: "paged", page: 61, total: 208, zoom: 1, spread: "double" }],
     ["银翼的证词", "comic", "folder", null, 15, { kind: "paged", page: 4, total: 96, zoom: 1, spread: "single" }],
-    ["建筑十书", "pdf", "pdf", "维特鲁威", 44, { kind: "paged", page: 0, total: 1, zoom: 1, spread: "single" }],
+    ["建筑十书", "pdf", "pdf", "维特鲁威", 44, null],
     ["公文格式规范 GB/T 9704", "doc", "ofd", null, 6, { kind: "paged", page: 2, total: 9, zoom: 1, spread: "single" }],
     ["季度数据汇总", "doc", "xlsx", null, 3, null],
     ["无名手记", "novel", "md", null, 71, { kind: "text", offset: 300, chapter: 1, total: 1 }],
@@ -111,13 +111,14 @@ const PARAGRAPH = [
  *
  * devMock 原先只做了文本与 EPUB，DOCX / PDF / OFD / XLSX / 漫画打开后是「壳起来了但正文空白」——
  * 这几个阅读器在浏览器里等于没法验证。这里给每种格式一份最小素材：
- * - PDF 是一份手写的 604 字节单页文档（base64 内联，pdf.js 直接吃 data URL）；
+ * - PDF 是一份手写的三页文档（base64 内联，pdf.js 直接吃 data URL）；
+ *   三页是为了能测「点左右翻页」——单页时 go(±1) 全被夹在 1，测不出对错；
  * - 漫画页是 SVG data URL，`<img>` 能渲染；
  * - DOCX / XLSX / MD 走同一个 HTML 管道，各给一段有代表性的结构（标题、表格、列表）。
  */
 const PDF_FIXTURE =
   "data:application/pdf;base64," +
-  "JVBERi0xLjQKJeLjz9MKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PgplbmRvYmoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PgplbmRvYmoKMyAwIG9iago8PC9UeXBlL1BhZ2UvUGFyZW50IDIgMCBSL01lZGlhQm94WzAgMCA0MjAgNTYwXS9Db250ZW50cyA0IDAgUi9SZXNvdXJjZXM8PC9Gb250PDwvRjEgNSAwIFI+Pj4+Pj4KZW5kb2JqCjQgMCBvYmoKPDwvTGVuZ3RoIDkxPj5zdHJlYW0KQlQgL0YxIDIyIFRmIDQ4IDQ2MCBUZCAoQ2Vucm8gZGV2IGZpeHR1cmUpIFRqIEVUCkJUIC9GMSAxMiBUZiA0OCA0MjAgVGQgKHBhZ2UgMSBvZiAxKSBUaiBFVAplbmRzdHJlYW0KZW5kb2JqCjUgMCBvYmoKPDwvVHlwZS9Gb250L1N1YnR5cGUvVHlwZTEvQmFzZUZvbnQvSGVsdmV0aWNhPj4KZW5kb2JqCnhyZWYKMCA2CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAxNSAwMDAwMCBuIAowMDAwMDAwMDYwIDAwMDAwIG4gCjAwMDAwMDAxMTEgMDAwMDAgbiAKMDAwMDAwMDIyMyAwMDAwMCBuIAowMDAwMDAwMzYxIDAwMDAwIG4gCnRyYWlsZXIKPDwvU2l6ZSA2L1Jvb3QgMSAwIFI+PgpzdGFydHhyZWYKNDI0CiUlRU9GCg==";
+  "JVBERi0xLjQKJeLjz9MKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PgplbmRvYmoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0NvdW50IDMvS2lkc1szIDAgUiA1IDAgUiA3IDAgUl0+PgplbmRvYmoKMyAwIG9iago8PC9UeXBlL1BhZ2UvUGFyZW50IDIgMCBSL01lZGlhQm94WzAgMCA0MjAgNTYwXS9Db250ZW50cyA0IDAgUi9SZXNvdXJjZXM8PC9Gb250PDwvRjEgOSAwIFI+Pj4+Pj4KZW5kb2JqCjQgMCBvYmoKPDwvTGVuZ3RoIDE5Mj4+c3RyZWFtCkJUIC9GMSAyMiBUZiA0OCA0NzAgVGQgKENlbnJvIGRldiBmaXh0dXJlIC0gcGFnZSAxKSBUaiBFVApCVCAvRjEgMTIgVGYgNDggNDMwIFRkICh0YXAgdGhlIGxlZnQgb3IgcmlnaHQgZWRnZSB0byBmbGlwKSBUaiBFVApCVCAvRjEgMTIgVGYgNDggNDAwIFRkICh0aGlzIHBhZ2UgZXhpc3RzIG9ubHkgZm9yIHNtb2tlIHRlc3RzKSBUaiBFVAplbmRzdHJlYW0KZW5kb2JqCjUgMCBvYmoKPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgNDIwIDU2MF0vQ29udGVudHMgNiAwIFIvUmVzb3VyY2VzPDwvRm9udDw8L0YxIDkgMCBSPj4+Pj4+CmVuZG9iago2IDAgb2JqCjw8L0xlbmd0aCAxOTI+PnN0cmVhbQpCVCAvRjEgMjIgVGYgNDggNDcwIFRkIChDZW5ybyBkZXYgZml4dHVyZSAtIHBhZ2UgMikgVGogRVQKQlQgL0YxIDEyIFRmIDQ4IDQzMCBUZCAodGFwIHRoZSBsZWZ0IG9yIHJpZ2h0IGVkZ2UgdG8gZmxpcCkgVGogRVQKQlQgL0YxIDEyIFRmIDQ4IDQwMCBUZCAodGhpcyBwYWdlIGV4aXN0cyBvbmx5IGZvciBzbW9rZSB0ZXN0cykgVGogRVQKZW5kc3RyZWFtCmVuZG9iago3IDAgb2JqCjw8L1R5cGUvUGFnZS9QYXJlbnQgMiAwIFIvTWVkaWFCb3hbMCAwIDQyMCA1NjBdL0NvbnRlbnRzIDggMCBSL1Jlc291cmNlczw8L0ZvbnQ8PC9GMSA5IDAgUj4+Pj4+PgplbmRvYmoKOCAwIG9iago8PC9MZW5ndGggMTkyPj5zdHJlYW0KQlQgL0YxIDIyIFRmIDQ4IDQ3MCBUZCAoQ2Vucm8gZGV2IGZpeHR1cmUgLSBwYWdlIDMpIFRqIEVUCkJUIC9GMSAxMiBUZiA0OCA0MzAgVGQgKHRhcCB0aGUgbGVmdCBvciByaWdodCBlZGdlIHRvIGZsaXApIFRqIEVUCkJUIC9GMSAxMiBUZiA0OCA0MDAgVGQgKHRoaXMgcGFnZSBleGlzdHMgb25seSBmb3Igc21va2UgdGVzdHMpIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKOSAwIG9iago8PC9UeXBlL0ZvbnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9IZWx2ZXRpY2E+PgplbmRvYmoKeHJlZgowIDEwCjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAxNSAwMDAwMCBuIAowMDAwMDAwMDYwIDAwMDAwIG4gCjAwMDAwMDAxMjMgMDAwMDAgbiAKMDAwMDAwMDIzNSAwMDAwMCBuIAowMDAwMDAwNDc1IDAwMDAwIG4gCjAwMDAwMDA1ODcgMDAwMDAgbiAKMDAwMDAwMDgyNyAwMDAwMCBuIAowMDAwMDAwOTM5IDAwMDAwIG4gCjAwMDAwMDExNzkgMDAwMDAgbiAKdHJhaWxlcgo8PC9TaXplIDEwL1Jvb3QgMSAwIFI+PgpzdGFydHhyZWYKMTI0MgolJUVPRgo=";
 
 const MD_HTML = `<h2>第一章 起风</h2>
 <p>写字的地方要安静，最好窗外有雨。<strong>手上的笔记</strong>与<em>心里的句子</em>不必一致。</p>

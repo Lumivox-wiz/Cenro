@@ -793,6 +793,7 @@
 
 /* 覆盖早前的 overflow:auto，滚动交给内部容器，避免双滚动条 */
 .pdf-stage {
+  position: relative;
   padding: var(--sp-6);
   overflow: hidden;
   align-items: flex-start;
@@ -817,71 +818,14 @@
   }
 }
 
-/* 点击翻页的两条热区：绝对定位，不参与文档流，也不吃中间区域的点击 */
-.pdf-stage {
-  position: relative;
-}
-
-.pdf-tap-layer {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  justify-content: space-between;
-  pointer-events: none;
-  /* 低于顶/底工具栏，高于画布 */
-  z-index: 1;
-}
-
-.pdf-tap {
-  width: 14%;
-  border: 0;
-  padding: 0;
-  background: none;
-  cursor: pointer;
-  pointer-events: auto;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.pdf-tap:active {
-  /* 老内核不认 color-mix：上一行是兜底，下一行才是精确值（顺序不能反） */
-  background: rgb(0 0 0 / 0.03);
-  background: color-mix(in srgb, var(--c-text-primary) 4%, transparent);
-}
-
-.pdf-tap:focus-visible {
-  outline: 2px solid var(--c-accent);
-  outline-offset: -3px;
-}
-
-/* 点击翻页的两条热区：绝对定位，不参与文档流，也不吃中间区域的点击 */
-.pdf-stage {
-  position: relative;
-}
-
-.pdf-tap-layer {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  justify-content: space-between;
-  pointer-events: none;
-  /* 低于顶/底工具栏，高于画布 */
-  z-index: 1;
-}
-
-.pdf-tap {
-  width: 14%;
-  border: 0;
-  padding: 0;
-  background: none;
-  cursor: pointer;
-  pointer-events: auto;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.pdf-tap:focus-visible {
-  outline: 2px solid var(--c-accent);
-  outline-offset: -3px;
-}
+/*
+ * 点哪翻页由舞台上的分区判定（左 25% / 右 25%），不再铺两条透明热区。
+ *
+ * 原来那两条热区是叠在画布上的按钮（z-index 1）。1.0 给 PDF 加了 pdf.js 文本层之后，
+ * 文本层是 z-index 2 且铺满整页，点击落在透明的文字节点上，热区只在页面两侧的空白条里
+ * 还能点中——表现就是「点左右不翻页」。改成按点击位置分区之后，
+ * 文本层可以放心地盖在最上面，选字与翻页不再互相挤占。
+ */
 
 .pdf-pages {
   display: flex;

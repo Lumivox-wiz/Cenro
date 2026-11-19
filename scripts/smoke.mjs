@@ -211,6 +211,34 @@ const SCRIPT = String.raw`(async () => {
   }
   check("PDF 文本层", !!pdfSpan, "可选中的文字层");
   check("PDF 划词落库", document.querySelectorAll(".pdf-hl").length > 0, "页内划线");
+
+  // ---- PDF 点左右翻页 ----
+  // 1.0 加的文本层盖在原来的透明热区之上，把翻页点没了；这里钉住它，别再回退。
+  window.getSelection()?.removeAllRanges();
+  await sleep(150);
+  const pdfStage = document.querySelector(".pdf-stage");
+  const pdfBox = pdfStage.getBoundingClientRect();
+  const pageText = () =>
+    document.querySelector(".reader-page-indicator")?.textContent?.trim() ?? "";
+  const tapAt = async (ratio) => {
+    const x = pdfBox.left + pdfBox.width * ratio;
+    const y = pdfBox.top + pdfBox.height * 0.5;
+    pdfStage.dispatchEvent(
+      new PointerEvent("pointerdown", { bubbles: true, clientX: x, clientY: y, pointerId: 7 }),
+    );
+    await sleep(50);
+    pdfStage.dispatchEvent(
+      new PointerEvent("pointerup", { bubbles: true, clientX: x, clientY: y, pointerId: 7 }),
+    );
+    pdfStage.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: x, clientY: y }));
+    await sleep(450);
+    return pageText();
+  };
+  const pdfStart = pageText();
+  const pdfRight = await tapAt(0.92);
+  const pdfLeft = await tapAt(0.08);
+  check("PDF 点右侧翻页", pdfRight !== pdfStart, pdfStart + " → " + pdfRight);
+  check("PDF 点左侧回翻", pdfLeft === pdfStart, pdfRight + " → " + pdfLeft);
   await back();
 
   // ---- 标签 ----
