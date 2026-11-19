@@ -4,7 +4,7 @@
 
 不联网、不要账号、不推书。书是你的文件，阅读记录是本机的一个 SQLite 文件。
 
-**v1.0.0**（2026-11-19）· Windows 与 Android 都有可安装构建 · [GPL-3.0-or-later](LICENSE) · Tauri 2 + React 19
+**v1.0.1**（2026-11-19）· Windows 与 Android 都有可安装构建 · [GPL-3.0-or-later](LICENSE) · Tauri 2 + React 19
 
 ![书架](docs/screenshots/shelf.png)
 
