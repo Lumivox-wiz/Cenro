@@ -1,0 +1,54 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Rust / Tauri
+src-tauri/target
+src-tauri/gen/schemas
+
+# 本地测试书库（由 scripts/gen_testdata.py 生成）
+.testdata
+
+# 打包产物
+release/
+
+# Tauri Android 生成物（gen/android 本身保留，构建产物不入库）
+src-tauri/gen/android/app/src/main/assets
+src-tauri/gen/android/app/build
+src-tauri/gen/android/build
+src-tauri/gen/android/.gradle
+src-tauri/gen/android/local.properties
+
+# 审计截图与设计素材（体积大、且属于过程产物）
+.audit/
+cenro-logo-v2_assets/
+cenro-logo-v2.miora
+now-light.png
+.playwright-cli/
+
+# 工作区里由助手维护的笔记，不进公开仓库
+.workbuddy/
+
+# pdf.js 的 CMap / 字体 / wasm：由 `npm run prebuild` 从 node_modules 同步，不入库
+public/pdfjs/

@@ -1,0 +1,223 @@
+/* ==========================================================================
+   Design Token — 与 docs/UI_SPEC.md 第 2 章一一对应
+   规则：组件不得硬编码颜色 / 字号 / 间距，一律引用本文件变量。
+   字号与间距以 rem 落盘（源规范以 px 定义，按 px ÷ 16 转换），根字号固定 16px。
+   色彩与阴影随主题变化，见 themes.css。
+   ========================================================================== */
+
+:root {
+  /* ---------- 2.1 色彩：暗色（默认） ---------- */
+  --c-bg-app: #17191e;
+  --c-bg-surface: #22252c;
+  --c-bg-elevated: #292d35;
+  --c-bg-reader: #1a1b1e;
+  --c-bg-hover: rgba(255, 255, 255, 0.06);
+  --c-bg-active: rgba(255, 255, 255, 0.1);
+  --c-bg-disabled: rgba(255, 255, 255, 0.04);
+  --c-bg-selected: rgba(91, 141, 239, 0.15);
+  --c-text-primary: #e6e7e9;
+  --c-text-secondary: #a0a3a9;
+  --c-text-tertiary: #8b909a;
+  --c-text-disabled: #4a4d53;
+  --c-text-inverse: #ffffff;
+  --c-text-on-accent: #0b1220;
+  --c-border-subtle: #343944;
+  /* v1.4：底色整体提亮后（surface #22252C / elevated #292D35），
+     原 #6E747E 对 elevated 只剩 2.93:1，差一点点过不了 1.4.11 → 提到 #737A84
+     （elevated 3.19 / surface 3.54 / app 4.06） */
+  --c-border-strong: #737a84;
+  --c-border-focus: #5b8def;
+  --c-accent: #5b8def;
+  /* 文字本身为强调色时使用（v1.3 新增），不得用 --c-accent 直写文字 */
+  --c-accent-text: #5b8def;
+  --c-accent-hover: #74a0f2;
+  --c-accent-subtle: rgba(91, 141, 239, 0.12);
+  --c-danger: #f85149;
+  --c-warning: #d29922;
+  --c-success: #3fb950;
+  --c-overlay: rgba(0, 0, 0, 0.6);
+
+  /* 阅读区正文色，由 data-reader-theme 覆盖 */
+  --c-reader-text: #d4d6da;
+
+  /* 封面内描边（v0.15.2 起）：卡片去框后它负责在纸面上切出封面边界 */
+  --c-cover-ring: rgba(255, 255, 255, 0.06);
+
+  /*
+   * ---------- 2.9 玻璃（v1.6） ----------
+   * 只用于浮层：目录、设置抽屉、书籍菜单、Toast。
+   * 常驻结构（侧栏 / 卡片）与阅读正文一律禁用——玻璃的意义是「浮在内容之上」，
+   * 一片纯色背后加 blur 只会得到一块没压平的塑料片（详见 docs/UI_TRANSLUCENCE_PLAN.md §2.3）。
+   * 顶栏是唯一例外，且前提是它真的浮起来了：v1.7 方案 B 之后顶栏绝对定位于滚动内容之上，
+   * 停在顶部时保持 0.55 的静止底色（v1.10 起，不再是完全透明），
+   * 内容滚到它下面后淡入玻璃（[data-scrolled] → 1）。
+   *
+   * --glass-bg 依赖 rgba 半透明 + backdrop-filter 同时成立；
+   * 组件里必须先写 --glass-bg-fallback 再写 --glass-bg，老内核丢掉后一条时才有实心兜底。
+   * fallback 的 alpha 必须接近 1（≥0.94）：没有模糊就没有「透」的语义，
+   * 压到 0.7 会让后面透出的文字与浮层文字直接打架。
+   */
+  --glass-blur: 12px;
+  --glass-saturate: 1.25;
+  --glass-bg: rgba(34, 37, 44, 0.72);
+  --glass-bg-fallback: rgba(34, 37, 44, 0.97);
+  /* 暗底上描边唯一可靠的边缘定义是「提亮」，压暗等于没有 */
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-shadow: 0 8px 24px rgba(0, 0, 0, 0.44);
+  /*
+   * v1.7 顶栏玻璃：唯一的「常驻结构用玻璃」例外。
+   * 它不是面板，是一层**只在内容滚到它下面时才出现**的浮层（见 components.css 末尾方案 B）。
+   *
+   * 不复用 --glass-* 的三个原因，都会写进 SPEC_AUDIT：
+   * 1. 背后不是纯色而是**任意封面**，亮度不可控，alpha 必须比浮层面板高；
+   * 2. blur 要更大：浮层背后是静态文字，顶栏背后是持续移动的封面，
+   *    12px 会把封面上的一行字糊成"看得见但读不出"的灰带，反而干扰视线；
+   * 3. 阴影不能用 --glass-shadow —— 那条是给 200~400px 的小浮层写的，
+   *    铺到一条 1440×56 的通栏上会变成一整片压暗，把内容区顶部糊掉。
+   */
+  --glass-header-bg: rgba(30, 33, 40, 0.70);
+  --glass-header-fallback: rgba(30, 33, 40, 0.97);
+  --glass-header-blur: 18px;
+  --glass-header-saturate: 1.35;
+  /* 暗底上唯一定得住边的是「提亮」，与 --glass-border 同一逻辑，只是更明确 */
+  --glass-header-line: rgba(255, 255, 255, 0.08);
+  --glass-header-shadow: 0 10px 20px -16px rgba(0, 0, 0, 0.85);
+
+  /*
+   * v1.9 内容区光晕色。
+   *
+   * 原来两处 radial-gradient 是硬编码 rgba，莫奈取色就改不动它——
+   * 抽成变量后，JS 换一组值即可让光晕跟着主色走，不必重写整条 background。
+   * alpha 仍按主题分开：同样的蓝在近黑底上会明显更强，暗色必须低一档。
+   */
+  --glow-a: rgba(91, 141, 239, 0.055);
+  --glow-b: rgba(47, 111, 235, 0.045);
+
+  /* 书架背景图之上的一层纸色遮罩（v1.9）。实测 0.64 是「字能读，图还在」的交点 */
+  --bg-scrim: rgba(23, 25, 30, 0.64);
+
+  /*
+   * v1.7 侧栏选中块：一枚「贴在纸上的薄片」，不是一块平涂色。
+   * v1.6 把侧栏面板拆掉之后，选中态只剩一层 10~15% 的蓝底，
+   * 在灰纸面上读作「这一格被涂了一笔」，而不是「你正在这一格」。
+   * 加一层贴近的投影 + 顶部 1px 内高光，它就离开纸面 1mm —— 刚好够读出层级，不会变成按钮。
+   */
+  --shadow-chip: 0 1px 3px rgba(0, 0, 0, 0.55), 0 10px 22px -10px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  /* 悬停只给贴纸的一半：存在感低于选中，避免 15 个条目一起「飘」 */
+  --shadow-chip-hover: 0 1px 2px rgba(0, 0, 0, 0.35);
+
+  /* ---------- 2.5 阴影（暗色） ---------- */
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.32);
+  --shadow-dialog: 0 16px 48px rgba(0, 0, 0, 0.48);
+  /* 封面（v1.6）：卡片去框后，封面是整张卡唯一的「物」，阴影必须自己把层次撑起来 */
+  --shadow-cover: 0 1px 3px rgba(0, 0, 0, 0.4), 0 10px 20px -14px rgba(0, 0, 0, 0.75);
+  --shadow-cover-hover: 0 4px 10px rgba(0, 0, 0, 0.45),
+    0 18px 32px -16px rgba(0, 0, 0, 0.85);
+  /* 控件立体感：静态一层薄投影 + 顶部 1px 高光，按下改为内凹 */
+  --shadow-btn: 0 1px 2px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-btn-hover: 0 2px 8px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --shadow-btn-active: inset 0 2px 4px rgba(0, 0, 0, 0.45);
+  --shadow-input: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+
+  /* ---------- 2.2 排版 ---------- */
+  --font-ui: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei",
+    "Noto Sans CJK SC", sans-serif;
+  --font-reader: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC",
+    "SimSun", serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+
+  --fs-11: 0.6875rem; /* 11px */
+  --fs-12: 0.75rem; /* 12px */
+  --fs-13: 0.8125rem; /* 13px */
+  --fs-14: 0.875rem; /* 14px */
+  --fs-16: 1rem; /* 16px */
+  /* v1.3 删除 --fs-18：与 --reader-font-size 双源，阅读正文一律走 --reader-* */
+  --fs-20: 1.25rem; /* 20px */
+  --fs-24: 1.5rem; /* 24px */
+  --fs-30: 1.875rem; /* 30px */
+
+  --lh-tight: 1.25;
+  --lh-ui: 1.5;
+  --lh-reader: 1.75;
+
+  /* 阅读运行时变量（与 --fs-* 阶梯解耦） */
+  --reader-font-size: 18px;
+  --reader-line-height: 1.75;
+  --reader-page-width: 680px;
+
+  /* ---------- 2.3 间距（4px 基准） ---------- */
+  --sp-1: 0.25rem; /* 4px */
+  --sp-2: 0.5rem; /* 8px */
+  --sp-3: 0.75rem; /* 12px */
+  --sp-4: 1rem; /* 16px */
+  --sp-5: 1.25rem; /* 20px */
+  --sp-6: 1.5rem; /* 24px */
+  --sp-8: 2rem; /* 32px */
+  --sp-10: 2.5rem; /* 40px */
+  --sp-12: 3rem; /* 48px */
+  --sp-14: 3.5rem; /* 56px */
+  --sp-16: 4rem; /* 64px */
+
+  /* ---------- 2.4 圆角 ----------
+   *
+   * 这里是**基准值**（普通圆角下看起来合适的量）。
+   *
+   * v1.11 起支持连续曲率（corner-shape: squircle）。superellipse 曲线比圆弧更贴直角，
+   * 同样半径下视觉圆角会缩水 20~25%，所以支持该特性时要整体放大一档作为补偿——
+   * 那组值写在 global.css 的 @supports 块里，而不是这里。
+   *
+   * 为什么不用条件切换直接写成一组：@supports 不匹配的环境（Android 老 WebView）
+   * 会拿到"补偿后的大半径 + 普通圆角"，比 v1.10 更圆，属于无谓的偏差。
+   * 分成两组，两边看到的圆润度才是同一个。
+   */
+  --r-sm: 6px;
+  /* 按钮/输入类控件用一档更大的圆角：点击区也更好看 */
+  --r-btn: 8px;
+  --r-md: 8px;
+  --r-lg: 13px;
+  --r-cover: 9px;
+  --r-xl: 16px;
+  --r-full: 999px;
+
+  /* ---------- 2.6 动效 ---------- */
+  --dur-fast: 120ms;
+  --dur-press: 100ms;   /* 按下反馈比悬停更快，手感更"脆" */
+  --dur-page: 160ms;
+  --dur-base: 180ms;
+  --dur-slow: 240ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  /* 翻页专用：快起、末端收住。
+     注：--ease-out 的 P1=(0.2,0)、P2=(0,1) 两端切线都水平，实为双端缓入缓出，
+     不适合做「由快到慢」的位移，故单独定义。 */
+  --ease-flip: cubic-bezier(0.05, 0.7, 0.1, 1);
+
+  /* ---------- 2.7 层级 ---------- */
+  /*
+   * 阅读页整层必须**高于书架顶栏**。顶栏为了修 Tooltip 遮挡建立了层叠上下文
+   * （z-index: 2），而阅读页原本是 0，于是书架顶栏盖在阅读页顶栏上，
+   * 「返回书架」按钮被整个挡住——表现为「进书之后退不出来」。
+   * 60 的取法：高于顶栏与书架内容，低于下拉/tooltip（100）、抽屉（200）、对话框（300）。
+   */
+  --z-reader: 60;
+  --z-reader-overlay: 10;
+  --z-dropdown: 100;
+  --z-drawer: 200;
+  --z-dialog: 300;
+  --z-toast: 400;
+  --z-debug: 999;
+
+  /* ---------- 2.8 图标尺寸 ---------- */
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --icon-xl: 48px;
+
+  /* ---------- 布局常量（4.1 / 4.2） ---------- */
+  --sidebar-w: 240px;
+  --sidebar-w-collapsed: 64px;
+  --topbar-h: 56px;
+  --content-max: 1440px;
+}

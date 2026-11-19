@@ -1,0 +1,220 @@
+/* ==========================================================================
+   Theme 映射 — 对应 docs/UI_SPEC.md 第 3 章
+   应用主题：html[data-theme="light" | "dark"]（system 由 JS 解析后写入实际值）
+   阅读主题：阅读容器 [data-reader-theme="light" | "dark" | "sepia" | "oled"]
+   ========================================================================== */
+
+/* ---------- 亮色应用主题（与暗色一一对应） ---------- */
+[data-theme="light"] {
+  /* 书架底色用中性浅灰：白卡压在上面才有实体感，暖白会让白卡显得脏 */
+  --c-bg-app: #f3f4f6;
+  --c-bg-surface: #ffffff;
+  --c-bg-elevated: #ffffff;
+  --c-bg-reader: #faf9f6;
+  --c-bg-hover: rgba(0, 0, 0, 0.04);
+  --c-bg-active: rgba(0, 0, 0, 0.07);
+  --c-bg-disabled: rgba(0, 0, 0, 0.03);
+  --c-bg-selected: rgba(47, 111, 235, 0.1);
+  --c-text-primary: #1f2328;
+  /* v1.3：原 #5C6370 实测 5.64:1，未达声明的 ≥6:1，改 #575E6A（6.1:1） */
+  --c-text-secondary: #575e6a;
+  --c-text-tertiary: #666c78;
+  --c-text-disabled: #a8adb5;
+  --c-text-inverse: #ffffff;
+  --c-text-on-accent: #ffffff;
+  --c-border-subtle: #e3e5e8;
+  /* v1.3：改 #888E97，对 #FFFFFF 3.30:1、对 #F7F7F5 3.08:1，两种承载背景均达标 */
+  --c-border-strong: #888e97;
+  --c-border-focus: #2f6feb;
+  --c-accent: #2f6feb;
+  /* 亮色下 #2F6FEB 直写文字仅 4.26:1，文字型强调色统一用更深一档 */
+  --c-accent-text: #2a66dc;
+  --c-accent-hover: #1f5fd6;
+  --c-accent-subtle: rgba(47, 111, 235, 0.08);
+  --c-danger: #cf222e;
+  --c-warning: #9a6700;
+  --c-success: #1a7f37;
+  --c-overlay: rgba(0, 0, 0, 0.4);
+
+  /* 亮色下的阅读正文色，否则会继承暗色值导致浅底浅字 */
+  --c-reader-text: #2b2b2b;
+
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-dialog: 0 16px 48px rgba(0, 0, 0, 0.18);
+  /* 封面（v1.6）：没有白卡兜底后，封面要自己在浅灰底上「站」起来 */
+  --shadow-cover: 0 1px 2px rgba(0, 0, 0, 0.1), 0 10px 22px -14px rgba(0, 0, 0, 0.38);
+  --shadow-cover-hover: 0 2px 6px rgba(0, 0, 0, 0.1), 0 16px 28px -16px rgba(0, 0, 0, 0.36);
+  --shadow-btn: 0 1px 2px rgba(16, 24, 40, 0.1), 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  --shadow-btn-hover: 0 2px 8px rgba(16, 24, 40, 0.14), 0 1px 2px rgba(16, 24, 40, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+  --shadow-btn-active: inset 0 2px 4px rgba(16, 24, 40, 0.14);
+  --shadow-input: inset 0 1px 2px rgba(16, 24, 40, 0.06);
+
+  --c-cover-ring: rgba(0, 0, 0, 0.08);
+
+  /* 玻璃（v1.6）：白玻璃压在浅灰底上，边缘靠 blur 自身产生的亮边，描边只需一点点 */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg-fallback: rgba(255, 255, 255, 0.97);
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --glass-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  /*
+   * v1.7 顶栏玻璃（结构与理由见 tokens.css 同名段）。
+   * 亮色 alpha 比暗色低一档：白玻璃压在浅灰底上本来就近白，
+   * 再抬到 0.84 就和页面分不开了，玻璃会退化成一块白条。
+   */
+  --glass-header-bg: rgba(255, 255, 255, 0.70);
+  --glass-header-fallback: rgba(255, 255, 255, 0.97);
+  /* 浅底上收口投影就够了，用深灰而不是纯黑，避免顶栏下沿发脏 */
+  --glass-header-line: rgba(16, 24, 40, 0.07);
+  --glass-header-shadow: 0 10px 20px -18px rgba(16, 24, 40, 0.45);
+
+  /* v1.9 内容区光晕（alpha 比暗色高一档：浅纸面上要更浓一点才看得见） */
+  --glow-a: rgba(47, 111, 235, 0.075);
+  --glow-b: rgba(91, 141, 239, 0.065);
+
+  /* 亮色遮罩用纸色而不是黑色：黑遮罩会把整张图压成灰泥，纸色只是把它推远一层 */
+  --bg-scrim: rgba(243, 244, 246, 0.74);
+
+  /* v1.7 侧栏选中块（结构与理由见 tokens.css 同名段） */
+  --shadow-chip: 0 1px 3px rgba(16, 24, 40, 0.12), 0 10px 22px -10px rgba(16, 24, 40, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --shadow-chip-hover: 0 1px 2px rgba(16, 24, 40, 0.06);
+}
+
+/* ---------- 阅读区主题（与应用主题解耦） ---------- */
+[data-reader-theme="dark"] {
+  --c-bg-reader: #1a1b1e;
+  --c-reader-text: #d4d6da;
+}
+
+[data-reader-theme="light"] {
+  --c-bg-reader: #faf9f6;
+  --c-reader-text: #2b2b2b;
+}
+
+[data-reader-theme="sepia"] {
+  --c-bg-reader: #f5efe3;
+  --c-reader-text: #3b3428;
+}
+
+[data-reader-theme="oled"] {
+  --c-bg-reader: #000000;
+  --c-reader-text: #b8b8b8;
+}
+
+/* ---------- 阅读容器：follow 时继承应用主题，显式主题优先 ---------- */
+/* 注意顺序：显式 data-reader-theme 的规则必须写在继承规则之后才会生效 */
+
+.reader-shell[data-reader-theme="dark"] {
+  --c-bg-reader: #1a1b1e;
+  --c-reader-text: #d4d6da;
+}
+
+.reader-shell[data-reader-theme="light"] {
+  --c-bg-reader: #faf9f6;
+  --c-reader-text: #2b2b2b;
+}
+
+.reader-shell[data-reader-theme="sepia"] {
+  --c-bg-reader: #f5efe3;
+  --c-reader-text: #3b3428;
+}
+
+.reader-shell[data-reader-theme="oled"] {
+  --c-bg-reader: #000000;
+  --c-reader-text: #b8b8b8;
+}
+
+/* ==========================================================================
+   液态玻璃材质（v1.13）— html[data-material="liquid"]
+   --------------------------------------------------------------------------
+   材质与配色是两个正交维度：同一个材质在亮色下是「白玻璃」，暗色下是「黑玻璃」。
+   所以选择器必须写成 [data-theme="x"][data-material="liquid"]（0,2,0），
+   才能盖住上方 [data-theme="light"] / :root 的单属性定义。
+
+   **只覆盖 --glass-* 变量，不重写组件规则。**
+   .glass / .toc.glass / .drawer.glass / .topbar::before 全部用 var(--glass-*) 取值，
+   改变量等于一次改完所有落点，也不必逐条处理 .toc.glass 那类 (0,2,0) 的几何覆盖
+   —— 同特异性硬拼会打架，改变量绕开了整个问题。
+
+   ⚠️ 整段包在 @supports (backdrop-filter) 里，不是可选的。
+   --glass-bg 的降级靠组件里的双写（先 fallback 再 bg）+ @supports not 块拉回实心。
+   液态段若裸写 --glass-bg，不支持模糊的内核照样读到它：
+   透明度生效、模糊不生效，背后文字会直接和浮层文字打架。
+   放进 @supports 后，「支持」与「不支持」两个块互斥，不可能同时命中。
+
+   ⚠️ --glass-bg-fallback 一律不动。它是没有模糊时的实心兜底（alpha ≥0.94），
+   跟着液态一起变透就等于把降级路径废掉。
+
+   液态玻璃与普通毛玻璃的差别，全在这三件事上：
+   1. **棱边**——上沿镜面高光 + 下沿收口，玻璃的「厚度」只从这里读得出来；
+   2. **饱和**——saturate 抬到 1.7~2.0，让背后的颜色透上来时是「发光」而不是「发灰」；
+   3. **透明度只降一档**——不是越透越像玻璃。玻璃要有实体感，纯靠透会把可读性拖下水。
+   ========================================================================== */
+
+@supports (backdrop-filter: blur(1px)) {
+  /* ---------- 暗色：黑玻璃 ---------- */
+  [data-theme="dark"][data-material="liquid"] {
+    --glass-blur: 22px;
+    --glass-saturate: 1.9;
+    /* 0.72 → 0.58。降一档就够：暗底上再透一点，背后书名就会开始干扰浮层文字 */
+    --glass-bg: rgba(32, 35, 42, 0.58);
+    /* 斜向扫光（折射层），只给液态用，见 components.css 末尾 */
+    --glass-sheen: rgba(255, 255, 255, 0.13);
+    --glass-border: rgba(255, 255, 255, 0.18);
+    --glass-shadow: 0 10px 34px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.22),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+
+    /* 比纸面（#17191e 附近）亮一档：同色时 blur 采不到差异，玻璃会消失 */
+    --glass-header-bg: rgba(44, 48, 56, 0.6);
+    --glass-header-blur: 26px;
+    --glass-header-saturate: 2;
+    --glass-header-line: rgba(255, 255, 255, 0.16);
+    --glass-header-shadow: 0 10px 24px -18px rgba(0, 0, 0, 0.9),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  /* ---------- 亮色：白玻璃 ---------- */
+  [data-theme="light"][data-material="liquid"] {
+    --glass-blur: 20px;
+    --glass-saturate: 1.7;
+    /* 白玻璃压在浅灰底上本来就接近白，透太多会和纸面糊成一片，只降一档 */
+    --glass-bg: rgba(255, 255, 255, 0.74);
+    --glass-sheen: rgba(255, 255, 255, 0.42);
+    /*
+     * 亮色棱边不能用纯白：白描边落在白玻璃上等于没有边界。
+     * 上沿给纯白（模拟天光），下沿给极淡的冷灰（模拟折射后的暗边），
+     * 一明一暗才切得出厚度。
+     */
+    --glass-border: rgba(255, 255, 255, 0.85);
+    --glass-shadow: 0 10px 34px rgba(16, 24, 40, 0.16), inset 0 1px 0 rgba(255, 255, 255, 1),
+      inset 0 -1px 0 rgba(16, 24, 40, 0.06);
+
+    --glass-header-bg: rgba(255, 255, 255, 0.62);
+    --glass-header-blur: 24px;
+    --glass-header-saturate: 1.8;
+    --glass-header-line: rgba(16, 24, 40, 0.07);
+    --glass-header-shadow: 0 10px 24px -18px rgba(16, 24, 40, 0.42),
+      inset 0 1px 0 rgba(255, 255, 255, 1);
+  }
+}
+
+/*
+ * 液态下内容区光晕加强。
+ *
+ * 为什么不放进上面的 @supports：光晕是纯 radial-gradient，跟 backdrop-filter 无关。
+ * 放进去会让不支持模糊的机器（老 WebView）连光晕也一起丢掉，
+ * 而在那种机器上光晕恰恰是唯一还留得住的「玻璃感」。
+ *
+ * 幅度只提到原来的 1.5 倍左右。注释里那条判断依然成立——
+ * 能被指认成「有个光斑」就是噪音，液态要的是「纸面更润」，不是「多了一盏灯」。
+ */
+[data-theme="dark"][data-material="liquid"] {
+  --glow-a: rgba(91, 141, 239, 0.085);
+  --glow-b: rgba(47, 111, 235, 0.07);
+}
+
+[data-theme="light"][data-material="liquid"] {
+  --glow-a: rgba(47, 111, 235, 0.11);
+  --glow-b: rgba(91, 141, 239, 0.095);
+}

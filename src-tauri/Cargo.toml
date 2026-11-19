@@ -1,0 +1,73 @@
+[package]
+name = "cenro"
+version = "0.21.0"
+description = "Local-first desktop reader for novels, comics and PDFs"
+authors = ["Lumivox"]
+license = "GPL-3.0-or-later"
+edition = "2024"
+# edition 2024 需要 1.85+；写出来，旧工具链会直接报清楚，而不是甩一堆语法错
+rust-version = "1.85"
+
+[lib]
+# The `_lib` suffix is needed to make the lib name unique and avoid conflicting
+# with the bin name on Windows. See https://github.com/rust-lang/cargo/issues/8519
+name = "cenro_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+rusqlite = { version = "0.41", features = ["bundled", "backup"] }
+walkdir = "2"
+encoding_rs = "0.8"
+sha2 = "0.11"
+thiserror = "2"
+zip = "9"
+image = "0.25"
+roxmltree = "0.21.2"
+tauri-plugin-fs = "2.7.1"
+sevenz-rust = "0.6.1"
+base64 = "0.23.1"
+unrar-rs = { version = "0.16.1", default-features = false, features = ["crypto-rust"] }
+pulldown-cmark = { version = "0.13.6", default-features = false, features = ["html"] }
+# 备份文件名与「上次备份」都按本地时区显示；std 没有时区信息，只能借 chrono
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+# 隐私书架的 PIN：只存 Argon2id 的 PHC 字符串，不存明文/简单哈希
+argon2 = "0.5"
+# 显式打开 getrandom，才拿得到 `rand_core::OsRng` 用来生成盐
+password-hash = { version = "0.5", features = ["getrandom"] }
+
+# 回收站只在桌面三平台可用：Android 没有系统回收站概念，
+# 放在 target 依赖里可以避免移动端编译时拉入无实现的分支。
+[target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
+trash = "5.3"
+# 双击打开：应用已开着时把参数转交给已有实例，不再起第二个窗口。
+# 只有桌面端有「多开」这回事，移动端由系统保证单实例，所以按 target 分。
+tauri-plugin-single-instance = "2"
+# WebDAV 走系统 TLS（Windows 上是 schannel）：读系统证书store，
+# 用户装了抓包 / 加速工具注入的根证书也能通过校验。
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "native-tls", "charset"] }
+
+# 移动端没有 native-tls，改用 rustls + 内置根证书。
+# 注意：不要开 reqwest 的 `rustls` 特性——那会拉 aws-lc-rs，需要 cmake/nasm。
+[target.'cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))'.dependencies]
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls-no-provider", "charset"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+webpki-roots = "1"
+
+# See https://tauri.app/concept/size/#cargo-configuration
+# 注意：codegen-units = 1 配合 lto = true 在 Windows 上会出现单线程链接卡死
+# （CPU/IO 均停止增长，实测 36 分钟无进展）。改用 thin LTO，体积可控且能出包。
+[profile.release]
+codegen-units = 16
+lto = "thin"
+opt-level = 3
+panic = "abort"
+strip = true

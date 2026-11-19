@@ -1,0 +1,69 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Cenro",
+  "version": "0.21.0",
+  "identifier": "com.lumivox.cenro",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "岑序 · 本地阅读器",
+        "width": 1280,
+        "height": 860,
+        "minWidth": 960,
+        "minHeight": 640,
+        "resizable": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data: asset: http://asset.localhost; script-src 'self' blob: 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost data: blob:",
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "publisher": "Lumivox",
+    "copyright": "Copyright © 2026 Lumivox",
+    "shortDescription": "本地优先的多格式阅读器",
+    "resources": [
+      "resources/licenses/unrar-rs-LICENSE.txt"
+    ],
+    "windows": {
+      "minimumWebview2Version": "109.0.1518.78",
+      "nsis": {
+        "languages": [
+          "SimpChinese",
+          "TradChinese",
+          "English"
+        ],
+        "displayLanguageSelector": false,
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "startMenuFolder": "岑序",
+        "template": "nsis/installer.nsi",
+        "installerHooks": "nsis/hooks.nsh"
+      }
+    }
+  }
+}

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover：Android 15+ 强制边到边，需显式声明才能拿到 env(safe-area-inset-*) --> 
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)" />
+    <title>岑序 · 本地阅读器</title>
+  </head>
+
+  <body>
+    <div id="root"></div>
+
+    <!--
+      启动兜底。
+      前端脚本如果因为 WebView2 过旧 / 资源加载失败而一行都没跑，
+      界面会是一片纯黑，用户除了「坏了」什么也说不出来。
+      这里放一块静态占位 + 经典脚本的早期错误捕获：
+      脚本正常起来会把它整块删掉，起不来就把错误直接印在窗口上。
+    -->
+    <style>
+      /* 内联：这段要在任何外部 CSS 之前生效，否则黑屏时连提示都看不见 */
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 32px;
+        background: #16171a;
+        color: #e6e7e9;
+        font: 14px/1.7 system-ui, "Microsoft YaHei", sans-serif;
+        white-space: pre-wrap;
+        word-break: break-word;
+        z-index: 2147483647;
+      }
+      #boot pre {
+        max-width: 720px;
+        max-height: 60vh;
+        overflow: auto;
+        margin: 0;
+        font-size: 12px;
+        color: #a0a3a9;
+      }
+    </style>
+
+    <div id="boot">正在启动…</div>
+    <script>
+      (function () {
+        var box = document.getElementById("boot");
+        if (!box) return;
+        var done = false;
+        function fail(title, detail) {
+          if (done) return;
+          done = true;
+          box.innerHTML = "";
+          var h = document.createElement("b");
+          h.textContent = title;
+          box.appendChild(h);
+          if (detail) {
+            var pre = document.createElement("pre");
+            pre.textContent = detail;
+            box.appendChild(pre);
+          }
+        }
+        window.addEventListener(
+          "error",
+          function (e) {
+            var t = e.target;
+            if (t && t.tagName) {
+              fail("资源加载失败", t.src || t.href || "");
+              return;
+            }
+            var stack = e.error && e.error.stack ? e.error.stack : "";
+            fail(
+              "启动失败",
+              (e.message || "") +
+                "\n" +
+                (e.filename || "") +
+                ":" +
+                (e.lineno || "") +
+                "\n" +
+                stack,
+            );
+          },
+          true,
+        );
+        window.addEventListener("unhandledrejection", function (e) {
+          var r = e.reason;
+          fail("启动失败（Promise）", (r && r.stack) || String(r));
+        });
+        window.setTimeout(function () {
+          fail(
+            "界面 5 秒内没有启动",
+            "多半是 WebView2 运行时过旧。请更新 Microsoft Edge WebView2 Runtime 后重试；\n" +
+              "若已是最新仍黑屏，可用仓库里的「兼容模式启动.bat」以 --disable-gpu 启动。",
+          );
+        }, 5000);
+      })();
+    </script>
+
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

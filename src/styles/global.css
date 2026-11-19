@@ -1,0 +1,200 @@
+/* ==========================================================================
+   Reset 与基础排版 — 对应 docs/UI_SPEC.md 第 8 / 11 章
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* 根字号固定 16px，UI 尺寸以 rem 表达以支持系统字体缩放 */
+  font-size: 16px;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  font-size: var(--fs-14);
+  line-height: var(--lh-ui);
+  color: var(--c-text-primary);
+  background: var(--c-bg-app);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  height: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+/* 焦点环不得移除 */
+:focus-visible {
+  outline: 2px solid var(--c-border-focus);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* 滚动条：低对比，不抢注意力 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--c-border-subtle);
+  border-radius: var(--r-full);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--c-border-strong);
+  background-clip: content-box;
+}
+
+/* 动效降级 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------------- 移动端安全区 ---------------- */
+
+/*
+ * Android 15+ 与 iOS 都是边到边渲染，状态栏与手势条会盖在 WebView 上。
+ * Tauri 桌面端 env() 恒为 0，所以这里不需要额外分支。
+ */
+:root {
+  /*
+   * 拆成两层：
+   * - base 由 env() 或运行时探针给（见 lib/safeArea.ts）；
+   * - extra 是用户在「设置 → 主题 → 手机布局」里手动补的差值。
+   * 消费方只认 --safe-top，不去关心它是怎么来的。
+   */
+  --safe-top-base: env(safe-area-inset-top, 0px);
+  --safe-top-extra: 0px;
+  --safe-top: calc(var(--safe-top-base) + var(--safe-top-extra));
+
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+/*
+ * 关闭 WebView 的自动字号放大（Text Autosizing）。
+ * 部分 Android WebView 会在 viewport 判定异常时把正文字号放大 1.5 倍以上，
+ * 连带把本来就紧的顶栏与设置面板撑出屏幕。
+ */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/*
+ * 仅供屏幕阅读器读取的内容。
+ * 播报位必须留在无障碍树里——display:none / visibility:hidden 会让
+ * aria-live 一起静音，所以只能用 1px 裁剪。
+ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------------- 连续曲率圆角（v1.11） ----------------
+ *
+ * `border-radius` 画的是真圆：直边与圆角相接那一点，曲率从 0 直接跳到 1/R，
+ * 眼睛沿着边缘扫过去能感到一道"折"。`corner-shape: squircle` 换成 superellipse 曲线，
+ * 曲率连续过渡——同样的数值下观感更饱满，也更接近系统原生控件的圆角。
+ *
+ * 用 @supports 而不是 JS 判断：不支持的浏览器（Android 老 WebView）
+ * 整块规则被丢弃，border-radius 原样生效，不会出现"圆角消失"的崩坏。
+ *
+ * 已知取舍：对 border-radius: 999px 的胶囊与圆点，squircle 会把两端由半圆
+ * 变成略方的超椭圆。12px 以下看不出差别，所以滑块拇指这类小圆点留着也行，
+ * 但 64px 的空状态圆底会明显"变方"，下面显式改回 round。
+ */
+@supports (corner-shape: squircle) {
+  /*
+   * 半径补偿。squircle 在同样数值下视觉圆角缩水 **35~40%**（不是最初估的 20~25%）：
+   * 把 9px 圆弧 / 10px / 14px / 18px 连续曲率并排后，10px 那档明显比 9px 圆弧更小更方，
+   * 14px 才回到原来的饱满度。因此封面 9 → 13、抽屉 16 → 20。
+   *
+   * 不是把所有值乘同一个数：小控件（按钮、输入框）圆角本来就接近半高，
+   * 按比例放大会直接变成胶囊，所以只加 2~3px；封面、抽屉这类大元素空间富余，加得多。
+   *
+   * 只在这个 @supports 块里生效，import 顺序上 global.css 在 tokens.css 之后，
+   * 同特异性下后者覆盖前者。
+   */
+  :root {
+    --r-sm: 8px;
+    --r-btn: 11px;
+    --r-md: 11px;
+    --r-lg: 16px;
+    --r-cover: 13px;
+    --r-xl: 20px;
+  }
+
+  *,
+  *::before,
+  *::after {
+    corner-shape: squircle;
+  }
+
+  /* 这几处要的是"真圆"，不是"更饱满的圆角" */
+  .empty-icon,
+  .pin-dot,
+  .slider::-webkit-slider-thumb,
+  *::-webkit-scrollbar-thumb {
+    corner-shape: round;
+  }
+}

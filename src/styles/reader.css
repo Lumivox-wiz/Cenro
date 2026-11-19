@@ -1,0 +1,1872 @@
+/* ==========================================================================
+   阅读页样式 — 对应 docs/UI_SPEC.md 4.3 / 5.5 / 5.6 / 6.1 / 6.2
+   原则：书架层可以丰富，阅读层必须克制。
+   ========================================================================== */
+
+.reader-shell {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--c-bg-reader);
+  color: var(--c-reader-text);
+  z-index: var(--z-reader);
+}
+
+/* ---------------- 正文区 ---------------- */
+
+.reader-stage {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  padding: var(--sp-12) var(--sp-12) var(--sp-10);
+}
+
+.reader-viewport {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+}
+
+/* 页窗口：只允许一页宽可见，columns 的第 2 列起被裁掉，翻页时再移入 */
+.reader-page-window {
+  /*
+   * 页边距在这里扣：分页的列宽就是这块的宽度，正文不加 padding。
+   * 给正文加 padding 不参与 column 宽度计算，末列会溢出到视口外。
+   */
+  width: max(
+    260px,
+    min(calc(var(--reader-page-width, 680px) - 2 * var(--reader-margin, 0px)), 100%)
+  );
+  height: 100%;
+  flex: 0 0 auto;
+  overflow: hidden;
+  /* 方向由 --enter-x 决定：进入下一章从右（+100%），回上一章从左（-100%） */
+  --enter-x: 100%;
+  animation: chapter-slide var(--dur-page) var(--ease-flip);
+}
+
+.reader-page-window[data-enter="prev"] {
+  --enter-x: -100%;
+}
+
+@keyframes chapter-slide {
+  from {
+    transform: translateX(var(--enter-x));
+    opacity: 0.6;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* 滚动模式没有横向翻页概念，保留淡入 */
+@keyframes chapter-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 分页：固定单列宽，靠 column-fill 横向溢出成多列，靠 translateX 翻页 */
+.reader-columns {
+  height: 100%;
+  flex: 0 0 auto;
+  column-fill: auto;
+  /* 单页翻页：由快到慢（快起、末端收住） */
+  transition: transform var(--reader-flip-dur, var(--dur-page)) var(--ease-flip);
+  will-change: transform;
+}
+
+.reader-text {
+  font-family: var(--font-reader);
+  font-size: var(--reader-font-size);
+  line-height: var(--reader-line-height);
+  color: var(--c-reader-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+/* 滚动模式 */
+.reader-scroll {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  animation: chapter-in var(--dur-slow) var(--ease-flip);
+}
+.reader-scroll-inner {
+  max-width: calc(var(--reader-page-width) - 2 * var(--reader-margin, 0px));
+  margin: 0 auto;
+  padding-bottom: var(--sp-16);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-columns {
+    transition: none;
+  }
+  .reader-scroll {
+    scroll-behavior: auto;
+  }
+}
+
+/* ---------------- 翻页热区 25 / 50 / 25 ---------------- */
+
+.reader-hotzone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  cursor: pointer;
+}
+
+.reader-hotzone-left {
+  left: 0;
+  width: 25%;
+  cursor: w-resize;
+}
+
+.reader-hotzone-center {
+  left: 25%;
+  width: 50%;
+}
+
+.reader-hotzone-right {
+  right: 0;
+  width: 25%;
+  cursor: e-resize;
+}
+
+/* ---------------- 工具栏（overlay，允许 backdrop-filter） ---------------- */
+
+.reader-topbar,
+.reader-bottombar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: var(--z-reader-overlay);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  /* 旧 WebView2 会丢掉 color-mix，退成不透明底色（半透明毛玻璃是加分项，不是必需） */
+  background: var(--c-bg-surface);
+  background: color-mix(in srgb, var(--c-bg-surface) 80%, transparent);
+  backdrop-filter: blur(12px);
+  transition: opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+.reader-topbar {
+  top: 0;
+  height: var(--sp-12);
+  padding: 0 var(--sp-4);
+  border-bottom: 1px solid var(--c-border-subtle);
+}
+
+.reader-bottombar {
+  bottom: 0;
+  height: var(--sp-10);
+  padding: 0 var(--sp-4);
+  border-top: 1px solid var(--c-border-subtle);
+}
+
+.reader-topbar[data-hidden="true"] {
+  opacity: 0;
+  transform: translateY(-100%);
+  pointer-events: none;
+}
+
+.reader-bottombar[data-hidden="true"] {
+  opacity: 0;
+  transform: translateY(100%);
+  pointer-events: none;
+}
+
+/*
+ * UX §4.2：首次进入漫画时的一次性方向提示，悬在底栏上方，
+ * 3 秒后由组件卸载。不挡交互，aria 由 role="status" 播报。
+ */
+.reader-dir-hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--sp-10) + var(--sp-3));
+  transform: translateX(-50%);
+  z-index: var(--z-reader-overlay);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--c-bg-elevated);
+  border: 1px solid var(--c-border-subtle);
+  box-shadow: var(--shadow-popover);
+  color: var(--c-text-secondary);
+  font-size: var(--fs-13);
+  line-height: var(--lh-ui);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: dir-hint-in var(--dur-base) var(--ease-out);
+}
+
+@keyframes dir-hint-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(var(--sp-2));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* 顶/底栏触发热区固定 48px；底栏 40px 时热区下探 8px（规范 4.3） */
+.reader-chrome-hotzone {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--sp-12);
+  z-index: calc(var(--z-reader-overlay) - 1);
+}
+
+.reader-chrome-hotzone-top {
+  top: 0;
+}
+
+.reader-chrome-hotzone-bottom {
+  bottom: 0;
+}
+
+.reader-toolbar-btn {
+  height: var(--sp-8);
+  min-width: var(--sp-8);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-sm);
+  color: var(--c-text-secondary);
+  font-size: var(--fs-13);
+  transition: background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.reader-toolbar-btn:hover {
+  background: var(--c-bg-hover);
+  color: var(--c-text-primary);
+}
+
+.reader-book-title {
+  font-size: var(--fs-13);
+  color: var(--c-text-primary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40vw;
+  text-align: left;
+}
+
+.reader-title-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.reader-spacer {
+  flex: 1;
+}
+
+/* ---------------- 底栏进度 ---------------- */
+
+.reader-progress {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.reader-page-indicator {
+  font-size: var(--fs-12);
+  color: var(--c-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: var(--sp-16);
+  text-align: center;
+}
+
+.reader-mode-toggle {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border-radius: var(--r-sm);
+  background: var(--c-bg-app);
+  border: 1px solid var(--c-border-subtle);
+}
+
+.reader-mode-toggle button {
+  height: var(--sp-6);
+  padding: 0 var(--sp-2);
+  border-radius: calc(var(--r-sm) - 1px);
+  font-size: var(--fs-12);
+  color: var(--c-text-tertiary);
+}
+
+.reader-mode-toggle button[aria-pressed="true"] {
+  background: var(--c-bg-elevated);
+  color: var(--c-text-primary);
+}
+
+/* ---------------- 目录抽屉 ---------------- */
+
+.toc {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 320px;
+  max-width: 88vw;
+  display: flex;
+  flex-direction: column;
+  /*
+   * 材质走 .glass（半透明 + blur）：目录浮在正文之上，模糊透出正文是标准做法，
+   * 实心底色会把「这是一层浮在上面的东西」这件事抹掉。
+   * 底色 / 描边 / 阴影都由 .glass 提供，这里只保留几何。
+   */
+  z-index: var(--z-drawer);
+  animation: toc-in var(--dur-slow) var(--ease-out);
+}
+
+@keyframes toc-in {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.toc-search {
+  padding: var(--sp-3);
+  border-bottom: 1px solid var(--c-border-subtle);
+}
+
+.toc-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sp-2);
+}
+
+.toc-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-13);
+  color: var(--c-text-secondary);
+  line-height: var(--lh-ui);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.toc-item:hover {
+  background: var(--c-bg-hover);
+  color: var(--c-text-primary);
+}
+
+.toc-item[aria-current="true"] {
+  background: var(--c-bg-selected);
+  color: var(--c-accent-text);
+  font-weight: 500;
+}
+
+/* ---------------- 阅读页占位 / 异常 ---------------- */
+
+.reader-notice {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  text-align: center;
+  color: var(--c-text-secondary);
+  padding: var(--sp-8);
+}
+
+.reader-notice-title {
+  font-size: var(--fs-16);
+  color: var(--c-text-primary);
+  font-weight: 600;
+}
+
+/* ---------------- PDF 视图 ---------------- */
+
+.pdf-stage {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: auto;
+  padding-top: var(--sp-16);
+}
+
+.pdf-canvas-wrap {
+  position: relative;
+  margin: 0 auto;
+}
+
+/* 规范 6.5：PDF 页面本身不加阴影，用间距区分页面 */
+.pdf-canvas {
+  display: block;
+  background: #ffffff;
+}
+
+.pdf-rendering {
+  position: absolute;
+  top: var(--sp-3);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--c-bg-elevated);
+  border: 1px solid var(--c-border-subtle);
+  font-size: var(--fs-11);
+  color: var(--c-text-secondary);
+  white-space: nowrap;
+}
+
+/* ---------------- 漫画视图 ---------------- */
+
+/* 覆盖 reader-stage 的大内边距，漫画需要尽量大的画布 */
+.comic-stage {
+  padding: var(--sp-6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.comic-page {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* 条漫：宽度 min(窗口, 800)，垂直连续，间距 --sp-2（规范 6.4） */
+.comic-webtoon {
+  height: 100%;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.comic-webtoon-inner {
+  width: min(100%, 800px);
+  margin: 0 auto;
+  padding-bottom: var(--sp-10);
+}
+
+.comic-webtoon-item {
+  margin-bottom: var(--sp-2);
+}
+
+.comic-webtoon-item img {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.comic-webtoon-placeholder {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--r-sm);
+  background: var(--c-bg-hover);
+  animation: skeleton-pulse 1200ms ease-in-out infinite;
+}
+
+/* ---------------- 快捷键提示浮层 ---------------- */
+
+.shortcut-help-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dropdown);
+}
+
+.shortcut-help {
+  position: absolute;
+  top: calc(var(--sp-12) + var(--sp-2));
+  right: var(--sp-4);
+  width: 340px;
+  max-width: 90vw;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: var(--sp-4);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--c-border-subtle);
+  background: var(--c-bg-elevated);
+  box-shadow: var(--shadow-popover);
+  z-index: calc(var(--z-dropdown) + 1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  animation: shortcut-in var(--dur-base) var(--ease-out);
+}
+
+@keyframes shortcut-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.shortcut-help-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-1);
+}
+
+.shortcut-help-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  font-size: var(--fs-13);
+  color: var(--c-text-secondary);
+  line-height: var(--lh-ui);
+}
+
+.shortcut-help-row kbd {
+  flex: 0 0 auto;
+  font-size: var(--fs-11);
+}
+
+.shortcut-help-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.shortcut-help-section-title {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-11);
+  /* 中文标题加宽字距只会散开字组，且 uppercase 对汉字无效，两者一并去掉 */
+  letter-spacing: 0.01em;
+  color: var(--c-text-tertiary);
+}
+
+.shortcut-help-hint {
+  flex: 0 0 auto;
+  font-size: var(--fs-11);
+  color: var(--c-text-tertiary);
+  white-space: nowrap;
+}
+
+/* ---------------- EPUB 内容 ---------------- */
+
+/* 覆盖 reader-text 的 pre-wrap：HTML 正文必须按正常空白排版 */
+.epub-content {
+  white-space: normal;
+}
+
+.epub-content p {
+  /* 段间距由「阅读设置 → 段间距」控制；0 时首行缩进仍保留，段落不至于糊成一片 */
+  margin: 0 0 var(--reader-para-gap, 0.9em);
+}
+
+.epub-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+.epub-content h1,
+.epub-content h2,
+.epub-content h3,
+.epub-content h4 {
+  margin: 1.2em 0 0.6em;
+  line-height: var(--lh-tight);
+  font-weight: 600;
+  /*
+   * 章节标题是阅读页唯一的「签名位」：字体已继承 --font-reader（衬线），
+   * 这里只补一点字距，让标题与正文区分开——换字体家族在 18px 中文上读不出差别，
+   * 字距与字重才是可见的层级。
+   */
+  letter-spacing: 0.02em;
+}
+
+.epub-content a {
+  color: var(--c-accent-text);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.epub-content a:hover {
+  text-decoration: underline;
+}
+
+.epub-content blockquote {
+  margin: 1em 0;
+  padding-left: 1em;
+  border-left: 2px solid var(--c-border-subtle);
+  color: var(--c-text-secondary);
+}
+
+.epub-content ul,
+.epub-content ol {
+  margin: 0 0 1em;
+  padding-left: 1.6em;
+}
+
+.epub-content li + li {
+  margin-top: 0.3em;
+}
+
+/*
+ * 代码：行内用浅底 + 等宽，块级独立成块并允许横向滚动。
+ * Markdown 之前被拍平成纯文本，这里补的是「代码看起来像代码」。
+ */
+.epub-content code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+  border-radius: var(--r-sm);
+  background: var(--c-bg-hover);
+}
+
+.epub-content pre {
+  margin: 1em 0;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  border: 1px solid var(--c-border-subtle);
+  background: var(--c-bg-hover);
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+/* 块内不再重复行内代码的底色，否则会出现一块深一块浅 */
+.epub-content pre code {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  font-size: 0.88em;
+}
+
+.epub-content hr {
+  margin: 1.8em 0;
+  border: none;
+  border-top: 1px solid var(--c-border-subtle);
+}
+
+.epub-content table {
+  width: 100%;
+  margin: 1em 0;
+  border-collapse: collapse;
+  font-size: 0.94em;
+}
+
+.epub-content th,
+.epub-content td {
+  padding: 0.4em 0.6em;
+  border: 1px solid var(--c-border-subtle);
+  text-align: left;
+}
+
+/*
+ * Excel 生成的表格。
+ *
+ * 上面那条 `.epub-content table { width: 100% }` 对正文里的插图表格没问题，
+ * 但对真正的电子表格是灾难：宽表被压到容器宽度，中文按字断行，
+ * 于是「在售型号数」竖着排成五列——手机上更狠，整张表只剩一列一个字。
+ * 这里改成按 Excel 自己给的列宽排（后端写进 colgroup），装不下就横向滚动。
+ */
+.epub-content .sheet-scroll {
+  margin: 1em 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.epub-content table.sheet {
+  /*
+   * 不要写 `min-width: 100%`：那会把表压到容器宽度，
+   * 再由 `table-layout: fixed` 按比例缩各列 —— 等于把 Excel 的列宽整个作废。
+   * 这里让表保持「列宽之和」，装不下由外层 .sheet-scroll 横向滚动。
+   */
+  width: auto;
+  table-layout: fixed;
+  border-collapse: collapse;
+  /*
+   * 0.82em ≈ 14.8px（正文 18px 时），正好对上 Excel 列宽单位的假设：
+   * Excel 的 width 以「默认字体字符数」计，一个字符约 7px，后端按 `w*7+5` 换算成 px。
+   * 字号再大一点列就装不下，数字会被拆成「101.4 / 1」。
+   */
+  font-size: 0.82em;
+  font-variant-numeric: tabular-nums;
+}
+
+.epub-content table.sheet th,
+.epub-content table.sheet td {
+  padding: 5px 8px;
+  border: 1px solid var(--c-border-subtle);
+  text-align: left;
+  vertical-align: top;
+  /* 用 break-word 而不是 anywhere：前者只在整词放不下时才断，
+     不然「101.41」会被拆成两行 */
+  overflow-wrap: break-word;
+}
+
+.epub-content table.sheet th {
+  background: var(--c-bg-hover);
+  font-weight: 600;
+}
+
+.epub-content th {
+  background: var(--c-bg-hover);
+  font-weight: 600;
+}
+
+/* 双页并排：中缝 --sp-2，两页各占一半，长边对齐 */
+.comic-spread {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  width: 100%;
+  height: 100%;
+}
+
+.comic-spread[data-mode="double"] .comic-page,
+.comic-spread[data-mode="double"] .comic-page-missing {
+  max-width: calc(50% - var(--sp-1));
+}
+
+.comic-page-missing {
+  max-height: 100%;
+  aspect-ratio: 2 / 3;
+  background: var(--c-bg-hover);
+  border-radius: var(--r-sm);
+}
+
+/* 双页模式下的单张页：占半宽并靠到正确一侧 */
+.comic-spread[data-align="right"] {
+  justify-content: flex-end;
+}
+
+.comic-spread[data-align="right"] .comic-page,
+.comic-spread[data-align="left"] .comic-page {
+  max-width: calc(50% - var(--sp-1));
+}
+
+.comic-spread[data-align="left"] {
+  justify-content: flex-start;
+}
+
+/* 双页模式下的封面：单独一屏，半宽居中 */
+.comic-spread[data-align="center"] {
+  justify-content: center;
+}
+
+.comic-spread[data-align="center"] .comic-page {
+  max-width: calc(50% - var(--sp-1));
+}
+
+/* ---------------- PDF 分页 / 滚动容器 ---------------- */
+
+/* 覆盖早前的 overflow:auto，滚动交给内部容器，避免双滚动条 */
+.pdf-stage {
+  padding: var(--sp-6);
+  overflow: hidden;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+/*
+ * 手机上 PDF 页面要尽量铺满宽度。
+ *
+ * 原来 stage 左右各留 24px，再叠上 fitScale 里多扣的 96px，
+ * 页面只剩屏宽 75%，看起来「画面太小」。现在 stage 只留 8px，
+ * fitScale 也按实测内容宽算，页面宽度接近满屏。
+ * 手机上「单/双页」按钮也一并藏起来：宽 <1200 时本来就会强制单页，按钮点了没反应。
+ */
+@media (max-width: 767px) {
+  .pdf-stage {
+    padding: var(--sp-2);
+  }
+
+  .pdf-spread-group {
+    display: none;
+  }
+}
+
+/* 点击翻页的两条热区：绝对定位，不参与文档流，也不吃中间区域的点击 */
+.pdf-stage {
+  position: relative;
+}
+
+.pdf-tap-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  /* 低于顶/底工具栏，高于画布 */
+  z-index: 1;
+}
+
+.pdf-tap {
+  width: 14%;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pdf-tap:active {
+  /* 老内核不认 color-mix：上一行是兜底，下一行才是精确值（顺序不能反） */
+  background: rgb(0 0 0 / 0.03);
+  background: color-mix(in srgb, var(--c-text-primary) 4%, transparent);
+}
+
+.pdf-tap:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: -3px;
+}
+
+/* 点击翻页的两条热区：绝对定位，不参与文档流，也不吃中间区域的点击 */
+.pdf-stage {
+  position: relative;
+}
+
+.pdf-tap-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  /* 低于顶/底工具栏，高于画布 */
+  z-index: 1;
+}
+
+.pdf-tap {
+  width: 14%;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pdf-tap:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: -3px;
+}
+
+.pdf-pages {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--sp-4);
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+.pdf-page {
+  flex: 0 0 auto;
+  background: #ffffff;
+}
+
+.pdf-page canvas {
+  display: block;
+}
+
+.pdf-page-placeholder {
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  background: var(--c-bg-hover);
+  animation: skeleton-pulse 1200ms ease-in-out infinite;
+}
+
+/* 连续滚动：页面间距 --sp-6，靠间距区分页面而非分割线（规范 6.5） */
+.pdf-scroll {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.pdf-scroll-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-6);
+  padding-bottom: var(--sp-10);
+}
+
+.pdf-page-slot {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: var(--sp-4);
+  width: 100%;
+}
+
+/* EPUB 滚动模式：正文居中，两侧留白 */
+.epub-scroll .reader-scroll-inner {
+  padding: 0 var(--sp-6) var(--sp-16);
+}
+
+/* ---------------- 窄屏阅读页 ---------------- */
+
+@media (max-width: 767px) {
+  .reader-stage {
+    padding: var(--sp-8) var(--sp-3) var(--sp-6);
+  }
+
+  .comic-stage,
+  .pdf-stage {
+    padding: var(--sp-2);
+  }
+
+  /*
+   * 只改左右内边距，不要用 `padding` 简写：
+   * 上面「移动端安全区补偿」给 .reader-topbar / -bottombar 设了 padding-top / -bottom，
+   * 简写会把它一起清零，顶栏内容就会居中到整条（含状态栏高度）的中间，
+   * 看起来仍然压在灵动岛下面。同样的问题 0.14.2 在书架顶栏上踩过一次。
+   */
+  .reader-topbar {
+    padding-left: var(--sp-2);
+    padding-right: var(--sp-2);
+    gap: var(--sp-1);
+  }
+
+  .reader-bottombar {
+    padding-left: var(--sp-2);
+    padding-right: var(--sp-2);
+    gap: var(--sp-1);
+  }
+
+  .reader-book-title {
+    max-width: 32vw;
+  }
+
+  .reader-page-indicator {
+    min-width: var(--sp-10);
+    font-size: var(--fs-11);
+  }
+
+  .toc {
+    width: 88%;
+  }
+
+  .shortcut-help {
+    width: calc(100vw - var(--sp-8));
+    right: var(--sp-4);
+  }
+}
+
+/* ---------------- 移动端安全区补偿 ---------------- */
+
+/*
+ * 上下工具栏是 absolute 浮层，直接贴边会压在状态栏 / 手势条上。
+ * 用 padding 撑出安全区，背景色自动延伸，视觉上仍是通栏。
+ */
+.reader-topbar {
+  height: calc(var(--sp-12) + var(--safe-top));
+  padding-top: var(--safe-top);
+  box-sizing: border-box;
+}
+
+.reader-bottombar {
+  height: calc(var(--sp-10) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  box-sizing: border-box;
+}
+
+/* 正文区同步让位，避免首行被顶栏遮住（顶栏是浮层，不占流） */
+.reader-stage {
+  padding-top: calc(var(--sp-12) + var(--safe-top));
+  padding-bottom: calc(var(--sp-10) + var(--safe-bottom));
+}
+
+.reader-shell {
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+  /* inset:0 已定尺寸，padding 必须内缩否则横向溢出 */
+  box-sizing: border-box;
+}
+
+/* 目录抽屉与快捷键浮层按安全区收边 */
+.toc {
+  padding-bottom: var(--safe-bottom);
+}
+
+.shortcut-help {
+  top: calc(var(--sp-12) + var(--sp-2) + var(--safe-top));
+}
+
+/* ---------------- 版心兜底 ---------------- */
+
+/*
+ * 页窗口宽度由 JS 按实测视口算出，但首帧可能偏大（WebView 默认尺寸布局）。
+ * max-width 保证任何情况下都不超过视口——宁可右侧少一点，
+ * 也不要出现「居中的超宽列把左右两侧同时裁掉」。
+ */
+.reader-page-window {
+  max-width: 100%;
+}
+
+/* 日志、URL 这类超长无空格串必须能在列内断行，否则会撑破版心 */
+.reader-text {
+  overflow-wrap: anywhere;
+}
+
+/* ---------------- 移动端：阅读页栏位不溢出 ---------------- */
+
+@media (max-width: 767px) {
+  /*
+   * PDF 底栏塞了缩放、旋转、模式、单双页、页码等七八个控件，
+   * 360px 宽放不下。窄屏改为可横向滚动，不裁切、不换行。
+   */
+  .reader-bottombar {
+    gap: var(--sp-1);
+    /* 只用左右内边距：简写会把底部的 safe-bottom 一起清零，按钮会压到手势条上 */
+    padding-left: var(--sp-2);
+    padding-right: var(--sp-2);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .reader-bottombar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .reader-topbar {
+    gap: var(--sp-1);
+    /* 见上：简写会清零 safe-top，只用左右内边距 */
+    padding-left: var(--sp-2);
+    padding-right: var(--sp-2);
+    overflow: hidden;
+  }
+
+  .reader-book-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 进度条在窄屏下优先保留，其余控件可按需滚动查看 */
+  .reader-progress {
+    min-width: 80px;
+  }
+}
+
+/* ---------------- 阅读页进入 / 返回转场 ---------------- */
+
+/*
+ * 书架常驻在底层，阅读页是浮层：返回时整页向右滑出，逐像素露出书架，
+ * 接近 Android 的 pop 转场，也比纯淡出更有「退回去」的方向感。
+ * 时长与 App.tsx 的 READER_EXIT_MS 必须一致，否则会在动画中途卸载。
+ */
+.reader-transition {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-reader);
+  animation: reader-enter 180ms var(--ease-flip);
+}
+
+.reader-transition[data-closing="true"] {
+  animation: reader-leave 220ms var(--ease-out) forwards;
+  /* 滑出过程中不再接收点击，避免误触到已移走的按钮 */
+  pointer-events: none;
+}
+
+@keyframes reader-enter {
+  from {
+    opacity: 0.7;
+    transform: translateX(6%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes reader-leave {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0.85;
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-transition,
+  .reader-transition[data-closing="true"] {
+    animation: none;
+  }
+}
+
+/* 页窗口宽度交给 CSS：min(偏好版心, 容器宽) 必然等于屏幕可用宽度，
+   JS 只读回这个结果，不再自己推算（推算法会拿到 WebView 旧布局尺寸） */
+.reader-page-window {
+  width: min(var(--reader-page-width, 680px), 100%);
+}
+
+/* 移动端轻点文字会闪一下系统高亮，并可能留下选区 */
+.reader-shell,
+.reader-page-window,
+.reader-text {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 列容器宽度跟随页窗口，不依赖 JS 计算的 px 值 */
+.reader-columns {
+  width: 100%;
+}
+
+/* ---------------- 工具栏显隐与正文让位 ---------------- */
+
+/*
+ * 顶栏与底栏是浮层（position: absolute），不占流。正文区一直留着
+ * 48 + 40 的上下让位，工具栏收起后那 88px 就白空着，等于把版心白切掉一截。
+ *
+ * 所以让位跟着工具栏走：收起时只留安全区加一点呼吸位，呼出时再退回原位。
+ * 上下各留一点而不是贴边，是因为状态栏与手势条仍然存在，不能让首行顶到屏幕边。
+ */
+.reader-stage {
+  transition:
+    padding-top 160ms var(--ease-out),
+    padding-bottom 160ms var(--ease-out);
+}
+
+.reader-shell[data-chrome="off"] > .reader-stage {
+  padding-top: calc(var(--sp-4) + var(--safe-top));
+  padding-bottom: calc(var(--sp-3) + var(--safe-bottom));
+}
+
+/* 工具栏呼出时正文回到原来的让位，等于「被裁掉」，与收起态的切换点一致 */
+.reader-shell[data-chrome="on"] > .reader-stage {
+  padding-top: calc(var(--sp-12) + var(--safe-top));
+  padding-bottom: calc(var(--sp-10) + var(--safe-bottom));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-stage {
+    transition: none;
+  }
+}
+
+/* ---------------- Word 转 HTML（v0.9.0） ---------------- */
+
+/*
+ * Word 用空格与制表符排版封面，HTML 默认会把连续空格折叠成一个，
+ * 于是「作者姓名：      黄昊」变成「作者姓名： 黄昊」。pre-wrap 保留空格，
+ * 换行仍由我们输出的 <br/> 控制。
+ */
+.docx-body {
+  white-space: pre-wrap;
+}
+
+/* ---------------- OFD 阅读器（v0.9.0） ---------------- */
+
+/*
+ * 每页是一张 SVG：按容器宽度等比缩放，宽度上限 880px，
+ * 超过就是一张放大到模糊的纸，没有必要。
+ */
+/*
+ * 用块级流 + margin:auto，不用 flex 居中。
+ *
+ * flex 容器里的居中一旦遇上「子项比容器宽」，左溢出部分是不可滚动的，
+ * 于是整页看起来往左偏、右边还多一截——Android WebView 上就是这样。
+ * 块级流没有这个问题：宽度按 100% 算，max-width 兜住大屏，margin 自动居中。
+ */
+.ofd-stage {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  /*
+   * 纵向 flex + 子项 `margin: auto` 是「安全居中」：
+   * - 一页放得下时上下留白相等，不再一坨黑挂在底部；
+   * - 页面比可视区高时，auto 边距退化为 0 → 从头开始显示，不会被裁掉顶部。
+   * （这正是 `justify-content: center` 做不到的：溢出时它会连顶端一起裁掉。）
+   */
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-12) var(--sp-6) var(--sp-10);
+}
+
+.ofd-page {
+  width: 100%;
+  max-width: 880px;
+  /* 行内基线会多出几像素，让容器严格等于 SVG 的高度 */
+  line-height: 0;
+  /* flex/grid 子项的 min-width:auto 会让长内容把盒子撑破，这里显式归零 */
+  min-width: 0;
+  margin: auto;
+  background: #ffffff;
+  border-radius: 2px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.ofd-page[data-loading="true"] {
+  opacity: 0.55;
+}
+
+.ofd-page svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/*
+ * 隐藏滚动条本身：OFD 一页基本能整屏放下，滚动条只在少数长页出现，
+ * 但它一旦占布局宽度（部分 WebView 是经典 15px 滚动条），页面就会整体左移，
+ * 看起来「偏了」。翻页用滚轮/点击，滚动条没有信息价值。
+ */
+.ofd-stage {
+  scrollbar-width: none;
+}
+
+.ofd-stage::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.ofd-nav {
+  justify-content: center;
+  gap: var(--sp-3);
+}
+
+.ofd-slider {
+  flex: 1;
+  max-width: 420px;
+}
+
+@media (max-width: 767px) {
+  /* 左右留 16px：贴边时页面会显得「往一侧靠」，也容易误触边缘翻页热区 */
+  .ofd-stage {
+    padding: var(--sp-10) var(--sp-4) var(--sp-8);
+  }
+}
+
+/* ---------------- 书签 / 搜索面板 ---------------- */
+
+/* 与目录抽屉同一套外壳，这里只补「页签 + 列表项」两层 */
+
+.extras-tabs {
+  display: flex;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3) 0;
+  border-bottom: 1px solid var(--c-border-subtle);
+}
+
+.extras-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  margin-bottom: -1px;
+  border: 1px solid transparent;
+  border-bottom: 1px solid transparent;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  background: none;
+  color: var(--c-text-secondary);
+  font-size: var(--fs-13);
+  cursor: pointer;
+}
+
+.extras-tab:hover {
+  color: var(--c-text-primary);
+  background: var(--c-bg-hover);
+}
+
+.extras-tab[aria-selected="true"] {
+  color: var(--c-text-primary);
+  border-color: var(--c-border-subtle);
+  border-bottom-color: var(--c-bg-surface);
+  background: var(--c-bg-surface);
+  font-weight: 500;
+}
+
+.extras-count {
+  font-size: var(--fs-11);
+  color: var(--c-text-tertiary);
+}
+
+/* 搜索行里「输入框 + 搜索按钮」并排 */
+.toc-search {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.extras-add {
+  flex: 0 0 auto;
+  height: var(--sp-8);
+  padding: 0 var(--sp-3);
+  font-size: var(--fs-12);
+}
+
+/* 书签页签里只有这一个按钮：铺满整行，别缩在左边 */
+.toc-search > .extras-add:only-child {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+/* 排序切换：两条小胶囊，只在书签多于一条时出现 */
+.extras-sort {
+  display: flex;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-3) var(--sp-2);
+}
+
+.extras-sort-btn {
+  height: 26px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--c-border-subtle);
+  background: none;
+  color: var(--c-text-secondary);
+  font-size: var(--fs-12);
+  cursor: pointer;
+}
+
+.extras-sort-btn:hover {
+  color: var(--c-text-primary);
+  background: var(--c-bg-hover);
+}
+
+.extras-sort-btn[aria-pressed="true"] {
+  color: var(--c-text-primary);
+  border-color: var(--c-border-strong);
+  background: var(--c-bg-selected);
+}
+
+/* 书签行：左边一整块可点（跳转），右边单独一个删除 */
+.bookmark-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  border-radius: var(--r-sm);
+}
+
+.bookmark-row:hover {
+  background: var(--c-bg-hover);
+}
+
+.bookmark-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-2) var(--sp-3);
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--c-text-primary);
+  cursor: pointer;
+}
+
+.bookmark-label {
+  font-size: var(--fs-13);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmark-time {
+  font-size: var(--fs-11);
+  color: var(--c-text-tertiary);
+}
+
+/* 位置 + 时间挤在一行小字里：位置是「回哪儿」，时间是「什么时候加的」 */
+.bookmark-loc {
+  font-size: var(--fs-11);
+  color: var(--c-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 行内重命名：占住整行宽度，不把右侧两个小按钮挤走 */
+.bookmark-input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  margin: var(--sp-1) 0;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--c-border-focus);
+  background: var(--c-bg-app);
+  color: var(--c-text-primary);
+  font-size: var(--fs-13);
+}
+
+.bookmark-act {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  color: var(--c-text-tertiary);
+}
+
+.bookmark-act:hover:not(:disabled) {
+  color: var(--c-text-primary);
+}
+
+.bookmark-act:disabled {
+  opacity: 0.35;
+}
+
+/* 删除后的撤销条：贴在面板底部，6 秒内有效 */
+.extras-undo {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--c-border-subtle);
+  background: var(--c-bg-elevated);
+  font-size: var(--fs-12);
+  color: var(--c-text-secondary);
+}
+
+.extras-undo button {
+  margin-left: auto;
+  padding: 2px var(--sp-2);
+  border-radius: var(--r-sm);
+  border: none;
+  background: none;
+  color: var(--c-accent-text);
+  font-size: var(--fs-12);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.extras-undo button:hover {
+  background: var(--c-bg-hover);
+}
+
+.bookmark-del {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  color: var(--c-text-tertiary);
+}
+
+.bookmark-del:hover {
+  color: var(--c-danger);
+}
+
+/* 搜索结果：章节名一行小字，正文一行截断 */
+.search-hit {
+  display: block;
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--c-text-secondary);
+}
+
+.search-hit:hover {
+  background: var(--c-bg-hover);
+  color: var(--c-text-primary);
+}
+
+.search-hit-chapter {
+  display: block;
+  font-size: var(--fs-11);
+  color: var(--c-text-tertiary);
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-hit-text {
+  display: block;
+  font-size: var(--fs-13);
+  line-height: var(--lh-ui);
+}
+
+.search-hit-text mark {
+  background: var(--c-bg-selected);
+  color: var(--c-accent-text);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.extras-empty {
+  margin: 0;
+  padding: var(--sp-4) var(--sp-3);
+  font-size: var(--fs-12);
+  line-height: var(--lh-ui);
+  color: var(--c-text-tertiary);
+}
+
+.extras-notice {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--c-border-subtle);
+  font-size: var(--fs-12);
+  color: var(--c-danger);
+}
+
+/* ==========================================================================
+   划词标注：正文里的高亮与选区操作条
+   ========================================================================== */
+
+/*
+ * 高亮不用「整块底色」，用底部一条荧光带。
+ * 整块底色会在暗色主题下把浅色正文压到黄底上，对比度掉得厉害；
+ * 荧光带只盖住字的下缘四分之一的面积，正文颜色一点不受影响，
+ * 四种阅读主题（暗 / 亮 / 羊皮纸 / OLED）都不用单独调。
+ */
+mark.hl {
+  color: inherit;
+  background: linear-gradient(transparent 58%, rgba(255, 205, 74, 0.62) 58%);
+  border-radius: 2px;
+  /* 换行处不要出现断裂的色块接缝 */
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* 笔记：同样的带子，再加一道虚线下划线，和纯高亮区分开 */
+mark.hl-note {
+  background: linear-gradient(transparent 58%, rgba(120, 200, 255, 0.55) 58%);
+  text-decoration: underline dotted rgba(120, 200, 255, 0.9);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+/* 点中划线本身不该变成「选中一片蓝」 */
+mark.hl::selection {
+  background: var(--c-bg-selected);
+}
+
+/* ---------- 选区操作条 ---------- */
+
+.sel-bar {
+  position: fixed;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--r-md, 12px);
+  border: 1px solid var(--c-border-subtle);
+  background: var(--c-bg-elevated);
+  color: var(--c-text-primary);
+  box-shadow: var(--shadow-popover);
+  animation: sel-bar-in 140ms var(--ease-out);
+}
+
+@keyframes sel-bar-in {
+  from {
+    opacity: 0;
+    margin-top: 4px;
+  }
+}
+
+.sel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: var(--c-text-primary);
+  font-size: var(--fs-12, 12px);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sel-btn:hover:not(:disabled) {
+  background: var(--c-bg-hover);
+}
+
+.sel-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sel-btn-primary {
+  background: var(--c-accent);
+  color: var(--c-text-on-accent);
+  font-weight: 600;
+}
+
+.sel-btn-primary:hover:not(:disabled) {
+  background: var(--c-accent-hover);
+}
+
+.sel-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: 2px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--c-text-tertiary);
+  cursor: pointer;
+}
+
+.sel-close:hover {
+  background: var(--c-bg-hover);
+  color: var(--c-text-primary);
+}
+
+/* 写笔记时变成一张小卡片，正文区域给足高度 */
+.sel-bar-note {
+  flex-direction: column;
+  align-items: stretch;
+  width: min(340px, calc(100vw - 32px));
+  padding: 8px;
+  gap: 6px;
+}
+
+.sel-note-input {
+  width: 100%;
+  min-height: 62px;
+  padding: 6px 8px;
+  border: 1px solid var(--c-border-subtle);
+  border-radius: 8px;
+  background: var(--c-bg-app);
+  color: var(--c-text-primary);
+  font-family: inherit;
+  font-size: var(--fs-13, 13px);
+  line-height: 1.5;
+  resize: none;
+}
+
+.sel-note-input:focus {
+  outline: none;
+  border-color: var(--c-border-focus);
+}
+
+.sel-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sel-hint {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--c-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 提示条 ---------- */
+
+.reader-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--safe-bottom, 0px) + 88px);
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  max-width: calc(100vw - 32px);
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--c-bg-elevated);
+  border: 1px solid var(--c-border-subtle);
+  color: var(--c-text-primary);
+  font-size: var(--fs-12, 12px);
+  box-shadow: var(--shadow-popover);
+  animation: sel-bar-in 140ms var(--ease-out);
+}
+
+/* ---------- 标注列表 ---------- */
+
+.extras-filters {
+  display: flex;
+  gap: 4px;
+  padding: 0 var(--sp-3) var(--sp-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.extras-filters::-webkit-scrollbar {
+  display: none;
+}
+
+.extras-filters .extras-sort-btn {
+  flex: 0 0 auto;
+}
+
+/* 行高比书签多一段：高亮要显示原文，还得留一行备注 */
+.annotation-row {
+  align-items: flex-start;
+  padding-top: 2px;
+}
+
+.annotation-row .bookmark-main {
+  gap: 3px;
+}
+
+.annotation-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* 类型徽标：一眼分清这行是书签、划线还是笔记 */
+.annotation-kind {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--c-text-secondary);
+  background: var(--c-bg-hover);
+  white-space: nowrap;
+}
+
+.annotation-kind-highlight {
+  color: #8a6100;
+  background: rgba(255, 205, 74, 0.24);
+}
+
+.annotation-kind-note {
+  color: var(--c-accent-text);
+  background: var(--c-accent-subtle);
+}
+
+[data-theme="dark"] .annotation-kind-highlight {
+  color: #ffd76a;
+}
+
+.annotation-quote,
+.annotation-main {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-13, 13px);
+  line-height: 1.45;
+  /* 原文可能很长：两行截断，用 title 看全文 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.annotation-quote {
+  color: var(--c-text-primary);
+}
+
+.annotation-main {
+  color: var(--c-text-primary);
+  font-weight: 500;
+}
+
+.annotation-sub {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: var(--fs-11, 11px);
+  color: var(--c-text-tertiary);
+}
+
+/* 笔记编辑框：多行，跟输入框同一套观感 */
+.bookmark-input.note-input {
+  height: auto;
+  min-height: 56px;
+  padding: 6px 8px;
+  line-height: 1.5;
+  resize: none;
+  font-family: inherit;
+  margin: var(--sp-1) var(--sp-2);
+}
+
+/* ---------- 脚注弹窗 ---------- */
+
+/*
+ * 贴在被点的引用标记旁边，读完即走。
+ * 层级放在浮条之上：两者理论上不会同时出现（一个要选区、一个要点击），
+ * 但真同时出现时，脚注是用户刚刚点出来的，应该在上面。
+ */
+.footnote-card {
+  position: fixed;
+  z-index: 92;
+  overflow-y: auto;
+  padding: 12px 34px 12px 14px;
+  border-radius: var(--r-md, 12px);
+  border: 1px solid var(--c-border-subtle);
+  background: var(--c-bg-elevated);
+  box-shadow: var(--shadow-popover);
+  animation: sel-bar-in 140ms var(--ease-out);
+}
+
+.footnote-text {
+  margin: 0;
+  font-size: var(--fs-13, 13px);
+  line-height: 1.7;
+  /* 注释是正文的延伸，不是辅助说明：按正文色，别用次级灰 */
+  color: var(--c-text-primary);
+  /* 注释里可能有书名、外文，长串要能断行 */
+  overflow-wrap: anywhere;
+}
+
+.footnote-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--c-text-tertiary);
+  cursor: pointer;
+}
+
+.footnote-close:hover {
+  background: var(--c-bg-hover);
+  color: var(--c-text-primary);
+}
