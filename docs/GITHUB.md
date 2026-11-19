@@ -83,6 +83,30 @@ gh release create v1.0.0 \
 
 （`<(...)` 是 bash 的进程替换；在 PowerShell 里先 `git tag` 再手动粘贴 notes。）
 
+## 5.5 仓库 About（描述 / 主页 / 话题）
+
+右侧 About 面板空着时，搜索里既不显示一句话介绍，也进不了话题聚合页。填好一次即可：
+
+| 字段 | 值 |
+|---|---|
+| Description | 把小说、漫画、PDF 收进同一个书架的本机阅读器。不联网、不要账号，阅读记录就是本机的一个 SQLite 文件。Tauri 2 + React 19。 |
+| Website | `https://github.com/Lumivox-wiz/Cenro/releases/latest` |
+| Topics | `ebook-reader` `pdf` `comic-reader` `tauri` `rust` `typescript` `android` `local-first` |
+
+网页上改：仓库首页右侧 **About 旁边的齿轮** → 填完点 Save changes。
+
+```bash
+# 命令行也可以，但需要 Administration 写权限；只有 repo 内容写权限的 token 会拿到 404
+gh api -X PATCH repos/<owner>/<repo> \
+  -f description="…" -f homepage="…" \
+  -f 'topics[]=ebook-reader' -f 'topics[]=pdf' -f 'topics[]=comic-reader' \
+  -f 'topics[]=tauri' -f 'topics[]=rust' -f 'topics[]=typescript' \
+  -f 'topics[]=android' -f 'topics[]=local-first'
+```
+
+> 那个 404 不是路径写错：GitHub 对「没有 Administration 权限」的 token 也回 404，
+> 而不是 403。看到 404 先怀疑权限，别怀疑仓库名。
+
 ## 6. 之后再要发版时
 
 ```bash

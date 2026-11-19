@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDFDFE"/>
+      <stop offset="52%" stop-color="#F8FAFE"/>
+      <stop offset="100%" stop-color="#E6EFFB"/>
+    </linearGradient>
+
+    <linearGradient id="farGrad" gradientUnits="userSpaceOnUse" x1="540" y1="0" x2="900" y2="0">
+      <stop offset="0%" stop-color="#E2EBF9"/>
+      <stop offset="100%" stop-color="#D3E1F5"/>
+    </linearGradient>
+    <linearGradient id="midGrad" gradientUnits="userSpaceOnUse" x1="620" y1="0" x2="1020" y2="0">
+      <stop offset="0%" stop-color="#C5D7EF"/>
+      <stop offset="100%" stop-color="#AFC6E8"/>
+    </linearGradient>
+    <linearGradient id="nearGrad" gradientUnits="userSpaceOnUse" x1="720" y1="0" x2="1160" y2="0">
+      <stop offset="0%" stop-color="#94B0DA"/>
+      <stop offset="100%" stop-color="#7B9BCF"/>
+    </linearGradient>
+
+    <linearGradient id="rightPeakGrad" x1="35%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#1E3F7A"/>
+      <stop offset="45%" stop-color="#355FA3"/>
+      <stop offset="85%" stop-color="#5885CC"/>
+      <stop offset="100%" stop-color="#87AEE6" stop-opacity="0.75"/>
+    </linearGradient>
+    <linearGradient id="leftPeakGrad" x1="10%" y1="85%" x2="75%" y2="20%">
+      <stop offset="0%" stop-color="#1D4180"/>
+      <stop offset="40%" stop-color="#4572BD"/>
+      <stop offset="80%" stop-color="#7EA6E0" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#B9D2F5" stop-opacity="0.35"/>
+    </linearGradient>
+    <linearGradient id="waveRibbon1" x1="0%" y1="50%" x2="100%" y2="65%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.05"/>
+      <stop offset="38%" stop-color="#EBF3FF" stop-opacity="0.72"/>
+      <stop offset="72%" stop-color="#769FDB" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#4673BD" stop-opacity="0.1"/>
+    </linearGradient>
+    <linearGradient id="waveRibbon2" x1="15%" y1="30%" x2="95%" y2="85%">
+      <stop offset="0%" stop-color="#2D569C" stop-opacity="0.75"/>
+      <stop offset="50%" stop-color="#6A94D4" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#ADC8F0" stop-opacity="0.15"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <path d="M 420 640 C 470 636 520 614 566 588 C 620 558 684 470 724 348 C 730 332 742 330 750 342 C 776 384 816 460 868 512 C 930 574 1030 604 1140 610 C 1200 613 1245 610 1280 606 L 1280 640 Z"
+        fill="url(#farGrad)"/>
+  <path d="M 520 640 C 580 634 640 612 690 586 C 750 554 830 470 880 410 C 890 396 902 398 908 412 C 934 466 980 528 1040 566 C 1100 604 1180 620 1280 626 L 1280 640 Z"
+        fill="url(#midGrad)"/>
+  <path d="M 640 640 C 720 634 800 614 870 586 C 940 556 1020 512 1062 484 C 1072 476 1084 480 1090 492 C 1120 540 1166 578 1220 600 C 1245 610 1266 618 1280 622 L 1280 640 Z"
+        fill="url(#nearGrad)"/>
+
+  <path d="M 750 344 C 776 386 816 460 866 510" stroke="#FFFFFF" stroke-width="2.4" fill="none" opacity="0.55" stroke-linecap="round"/>
+  <path d="M 908 414 C 934 468 980 528 1038 564" stroke="#FFFFFF" stroke-width="2" fill="none" opacity="0.42" stroke-linecap="round"/>
+  <path d="M 1090 494 C 1120 542 1166 578 1218 600" stroke="#FFFFFF" stroke-width="1.8" fill="none" opacity="0.32" stroke-linecap="round"/>
+
+  <g transform="translate(96, 88) scale(0.30)">
+    <path d="M 168 126 L 204 54 C 210 42, 222 42, 231 53 L 366 196 C 324 186, 276 162, 230 144 C 206 135, 186 130, 168 126 Z"
+          fill="url(#rightPeakGrad)"/>
+    <path d="M 142 120 L 175 62 C 181 51, 192 51, 200 61 L 304 182 C 254 166, 200 140, 142 120 Z"
+          fill="url(#waveRibbon1)" opacity="0.6"/>
+    <path d="M 34 196 L 132 90 C 141 80, 154 80, 164 90 L 284 188 C 230 162, 174 146, 122 156 C 88 162, 58 178, 34 196 Z"
+          fill="url(#leftPeakGrad)"/>
+    <path d="M 176 112 C 205 116, 235 132, 266 154 C 298 176, 332 190, 366 196 C 322 194, 278 182, 238 160 C 202 140, 172 132, 142 136 C 154 126, 165 117, 176 112 Z"
+          fill="url(#waveRibbon1)"/>
+    <path d="M 94 162 C 146 142, 198 148, 254 174 C 292 191, 330 198, 366 196 C 316 192, 268 172, 224 148 C 184 126, 142 134, 94 162 Z"
+          fill="url(#waveRibbon2)"/>
+  </g>
+
+  <line x1="236" y1="100" x2="236" y2="148" stroke="#C6CFDD" stroke-width="1"/>
+
+  <text x="256" y="128" font-family="'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif"
+        font-size="28" font-weight="400" letter-spacing="8" fill="#2A313D">岑序</text>
+  <text x="256" y="150" font-family="'Inter', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+        font-size="12" font-weight="500" letter-spacing="6" fill="#6B7688">CENRO</text>
+
+  <text x="96" y="312" font-family="'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif"
+        font-size="72" font-weight="600" letter-spacing="2.5" fill="#1B2129">所有格式，</text>
+  <text x="96" y="400" font-family="'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif"
+        font-size="72" font-weight="600" letter-spacing="2.5" fill="#1B2129">一座书架。</text>
+
+  <text x="96" y="456" font-family="'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif"
+        font-size="18" font-weight="400" letter-spacing="0.6" fill="#4E5867">把小说、漫画、PDF 收进同一个书架的本机阅读器。</text>
+
+  <text x="96" y="500" font-family="'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif"
+        font-size="15" font-weight="400" letter-spacing="0.4" fill="#7C8698">不联网 · 不要账号 · 不要书源</text>
+
+  <text x="96" y="600" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif"
+        font-size="11" font-weight="400" letter-spacing="2" fill="#A6B1C2">EPUB · MOBI · PDF · CBZ · CBR · DOCX · TXT · OFD</text>
+</svg>
