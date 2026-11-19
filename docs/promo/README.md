@@ -9,9 +9,17 @@
 | `cenro-banner@2x.png` | 2560×800（显示 1280×400） | README 顶部横幅，**引用这个** |
 | `cenro-banner.png` | 1280×400 | 同上，1x 版；不想让仓库多背 240 KB 时用 |
 | `cenro-social-preview.png` | 1280×640 | GitHub 仓库 Settings → Social preview（分享链接时的预览图） |
+| `cenro-poster.png` | 1080×1080 | 方图海报，带二维码，小红书 / 朋友圈 / 酷安用 |
+| `cenro-poster@2x.png` | 2160×2160 | 同上，2x |
 | `cenro-banner.svg` | 1280×400 | 源文件，改文案改配色在这里动 |
 | `cenro-social.svg` | 1280×640 | 源文件 |
+| `cenro-poster.svg` | 1080×1080 | 方图源文件，二维码已内嵌为路径 |
 | `render-*.html` | — | 出图脚手架，无头 Edge 截图用 |
+| `cenro-moments-01.png` ~ `06.png` | 1080×1080 | 朋友圈 / 小红书九宫格套图，六张一组 |
+| `COPY.md` | — | 发帖文案（通用 / 酷安 / 小红书 / V2EX） |
+| `MOMENTS.md` | — | 朋友圈文案 + 配图顺序 |
+| `card-1.html` ~ `card-6.html` | — | 套图的 HTML 源，改文案后重新截图即得新图 |
+| `_gen_cards.py` | — | 生成上面六个 HTML 的脚本 |
 
 ## 用法
 
@@ -39,7 +47,29 @@ EDGE="C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
 "$EDGE" --headless=new --disable-gpu --hide-scrollbars \
   --force-device-scale-factor=1 --window-size=1280,640 --virtual-time-budget=3000 \
   --screenshot="cenro-social-preview.png" "file:///$PWD/render-social.html"
+
+"$EDGE" --headless=new --disable-gpu --hide-scrollbars \
+  --force-device-scale-factor=2 --window-size=1080,1080 --virtual-time-budget=3000 \
+  --screenshot="cenro-poster@2x.png" "file:///$PWD/render-poster.html"
 ```
+
+## 重新生成二维码
+
+站点路径变了才需要。二维码已以 `<path>` 形式内嵌在 `cenro-poster.svg` 里，没有外部依赖：
+
+```bash
+mkdir -p /tmp/qrgen && cd /tmp/qrgen && npm i qrcode --no-save
+node -e "
+const QR=require('qrcode'),fs=require('fs');
+const qr=QR.create('https://lingmeng.net.cn/apps/cenro/',{errorCorrectionLevel:'M'});
+const n=qr.modules.size,d=qr.modules.data;let p='';
+for(let y=0;y<n;y++)for(let x=0;x<n;x++){if(d[y*n+x])p+='M'+x+' '+y+'h1v1h-1z';}
+fs.writeFileSync('qr.txt',p);
+"
+```
+
+然后把 `qr.txt` 的内容替换掉 `cenro-poster.svg` 里 `<g transform="translate(112, 826) scale(4.483)">` 下那条 `<path>` 的 `d`。
+`scale` 的值 = 二维码边长 ÷ 模块数（29 个模块、130px → 4.483）。
 
 `--force-device-scale-factor=2` 出 2x，`=1` 出 1x。截图尺寸 = `window-size × scale`，实测无边框偏移。
 

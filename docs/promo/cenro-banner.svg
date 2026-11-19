@@ -80,11 +80,14 @@
   <text x="206" y="107" font-family="'Inter', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
         font-size="10" font-weight="500" letter-spacing="5" fill="#6B7688">CENRO</text>
 
-  <text x="72" y="216" font-family="'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif"
+  <text x="72" y="204" font-family="'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif"
         font-size="56" font-weight="600" letter-spacing="2" fill="#1B2129">所有格式，</text>
-  <text x="72" y="280" font-family="'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif"
+  <text x="72" y="268" font-family="'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif"
         font-size="56" font-weight="600" letter-spacing="2" fill="#1B2129">一座书架。</text>
 
-  <text x="72" y="328" font-family="'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif"
+  <text x="72" y="314" font-family="'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif"
         font-size="15" font-weight="400" letter-spacing="0.5" fill="#4E5867">小说、漫画、PDF —— 不联网，不要账号，进度只在本机。</text>
+
+  <text x="72" y="358" font-family="'Inter', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+        font-size="14" font-weight="500" letter-spacing="0.2" fill="#2F6FEB">lingmeng.net.cn/apps/cenro</text>
 </svg>
