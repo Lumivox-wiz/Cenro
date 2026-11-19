@@ -104,8 +104,9 @@ gh api -X PATCH repos/<owner>/<repo> \
   -f 'topics[]=android' -f 'topics[]=local-first'
 ```
 
-> 那个 404 不是路径写错：GitHub 对「没有 Administration 权限」的 token 也回 404，
-> 而不是 403。看到 404 先怀疑权限，别怀疑仓库名。
+> 那个 404 不是路径写错，也不是仓库名写错：**token 没有 `repo` scope 时，GitHub 对这条端点回 404 而不是 403**。
+> 这次踩到的具体情形是环境变量里有一个空的 `GITHUB_TOKEN`，把凭据管理器里的正常 token 顶掉了。
+> 排查顺序：`echo ${#GITHUB_TOKEN}` 看有没有被环境变量劫持 → `X-Oauth-Scopes` 看范围 → 最后才怀疑路径。
 
 ## 6. 之后再要发版时
 
