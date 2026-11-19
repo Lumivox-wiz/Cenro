@@ -117,7 +117,38 @@ gh api -X PATCH repos/<owner>/<repo> \
 # 3) 打包：Windows NSIS + 便携 exe、Android APK
 # 4) git tag vX.Y.Z && git push origin main --tags
 # 5) gh release create ...
+# 6) scripts/mirror-gitee.sh          # 同步到 Gitee 镜像
 ```
+
+## 7. Gitee 镜像
+
+代码在 [gitee.com/Lumivox/cenro](https://gitee.com/Lumivox/cenro) 留一份，给国内访问不稳的人。
+只同步代码与标签，**安装包仍走 GitHub Releases**——Gitee 的「发行版」要手动上传，
+而且单文件上限小于我们的 APK 打包习惯，容易踩坑。
+
+首次：
+
+```bash
+git remote add gitee https://gitee.com/Lumivox/cenro.git
+git push gitee main
+git push gitee --tags
+```
+
+之后每次发完版跑一次：
+
+```bash
+scripts/mirror-gitee.sh
+```
+
+脚本里显式清了 `GITHUB_TOKEN` / `GH_TOKEN` 两个环境变量。原因见 §5.5：
+这套环境会注入一个空 scope 的 `GITHUB_TOKEN`，它会把凭据管理器里的正常 token 顶掉，
+表现为 `git push` 报 `403 ... denied`，而 `gh auth status` 看起来一切正常。
+
+**Gitee 侧的注意事项**：
+
+- 公开仓库要过「开源审核」（提交后一般几十分钟），审核期间只有自己能看到；
+- 大于 100 MB 的单文件不允许入库，二进制别提交进仓库；
+- 没有 GitHub Actions 那样的免费 CI，标签推过去只是标签，不会自动构建。
 
 ## 附：仓库里没有的东西
 
