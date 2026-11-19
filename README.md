@@ -118,8 +118,8 @@ MOBI 与 ZIP 按内容判定：图片记录 ≥ 3 条走漫画阅读器，否则
 | Windows | `Cenro-<版本>-win-x64-portable.exe` | 免安装 |
 | Android | `Cenro-<版本>-android-arm64.apk` | 只含 arm64-v8a |
 
-国内访问 GitHub 不稳时，代码镜像在 [gitee.com/Lumivox/cenro](https://gitee.com/Lumivox/cenro)
-（同步 `main` 与标签，可用 `scripts/mirror-gitee.sh` 更新）；安装包仍以 GitHub Releases 为准。
+国内访问 GitHub 不稳时，用 Gitee 镜像：[gitee.com/Lumivox/cenro](https://gitee.com/Lumivox/cenro)
+——代码、标签与**安装包**都有（[发行版](https://gitee.com/Lumivox/cenro/releases)）。
 
 没有上架任何应用商店。Windows 需要 WebView2（Win11 自带；Win10 缺失时装一次
 [Evergreen Runtime](https://go.microsoft.com/fwlink/p/?LinkId=2124703)）。

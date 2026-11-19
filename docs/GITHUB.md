@@ -117,14 +117,14 @@ gh api -X PATCH repos/<owner>/<repo> \
 # 3) 打包：Windows NSIS + 便携 exe、Android APK
 # 4) git tag vX.Y.Z && git push origin main --tags
 # 5) gh release create ...
-# 6) scripts/mirror-gitee.sh          # 同步到 Gitee 镜像
+# 6) scripts/mirror-gitee.sh          # 同步代码与标签到 Gitee
+# 7) GITEE_TOKEN=xxx python scripts/release-gitee.py vX.Y.Z --notes docs/release-notes.md
 ```
 
 ## 7. Gitee 镜像
 
 代码在 [gitee.com/Lumivox/cenro](https://gitee.com/Lumivox/cenro) 留一份，给国内访问不稳的人。
-只同步代码与标签，**安装包仍走 GitHub Releases**——Gitee 的「发行版」要手动上传，
-而且单文件上限小于我们的 APK 打包习惯，容易踩坑。
+代码、标签、发行版（含安装包）都有。
 
 首次：
 
@@ -144,10 +144,23 @@ scripts/mirror-gitee.sh
 这套环境会注入一个空 scope 的 `GITHUB_TOKEN`，它会把凭据管理器里的正常 token 顶掉，
 表现为 `git push` 报 `403 ... denied`，而 `gh auth status` 看起来一切正常。
 
+发行版用脚本建，幂等——同一个 tag 重跑只补缺的文件：
+
+```bash
+# 令牌：Gitee → 设置 → 私人令牌，勾选 projects
+GITEE_TOKEN=xxx python scripts/release-gitee.py v1.0.0 \
+  --name "岑序 Cenro 1.0.0" --notes docs/release-notes.md
+```
+
+`docs/release-notes.md` 是**当前版本**的发行说明（给下载者看的那份，不是 CHANGELOG），
+每次发版改它，GitHub 与 Gitee 共用。
+
 **Gitee 侧的注意事项**：
 
 - 公开仓库要过「开源审核」（提交后一般几十分钟），审核期间只有自己能看到；
 - 大于 100 MB 的单文件不允许入库，二进制别提交进仓库；
+- 附件名用 ASCII：非 ASCII 文件名在 GitHub 会被吞掉（`兼容模式启动.bat` → `.bat`），
+  两边统一用 `Cenro-1.0.0-compat-mode.bat` 这种写法；
 - 没有 GitHub Actions 那样的免费 CI，标签推过去只是标签，不会自动构建。
 
 ## 附：仓库里没有的东西
