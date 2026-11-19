@@ -1,6 +1,6 @@
 # 岑序 · Cenro
 
-**把小说、漫画、PDF 收进同一个书架的本机阅读器。**
+![岑序 Cenro：所有格式，一座书架](docs/promo/cenro-banner@2x.png)
 
 不联网、不要账号、不推书。书是你的文件，阅读记录是本机的一个 SQLite 文件。
 
