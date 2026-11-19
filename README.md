@@ -1,6 +1,6 @@
 # 岑序 · Cenro
 
-![岑序 Cenro：所有格式，一座书架](docs/promo/cenro-banner@2x.png)
+![岑序 Cenro：所有格式，一座书架](docs/assets/cenro-banner@2x.png)
 
 不联网、不要账号、不推书。书是你的文件，阅读记录是本机的一个 SQLite 文件。
 
