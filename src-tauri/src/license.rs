@@ -19,6 +19,9 @@ const PROJECT: &str = include_str!("../../LICENSE");
 /// unrar-rs（CBR 解压）：Apache-2.0 + UnRAR 附加条款
 const UNRAR_RS: &str = include_str!("../resources/licenses/unrar-rs-LICENSE.txt");
 
+/// 扫描件 OCR 用的模型与推理引擎。模型是 Apache-2.0，随包分发就必须带这份许可。
+const PPOCR: &str = include_str!("../resources/licenses/ppocr-LICENSE.txt");
+
 #[derive(Serialize)]
 pub struct LicenseText {
     /// 展示用名称，带上许可标识，用户一眼知道自己在看什么
@@ -37,6 +40,10 @@ pub fn license_texts() -> Vec<LicenseText> {
         LicenseText {
             name: "unrar-rs · Apache-2.0 + UnRAR 附加条款",
             body: UNRAR_RS,
+        },
+        LicenseText {
+            name: "PP-OCRv6 · Apache-2.0 · © PaddlePaddle Authors",
+            body: PPOCR,
         },
     ]
 }

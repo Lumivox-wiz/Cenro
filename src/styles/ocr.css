@@ -1,0 +1,15 @@
+/*
+ * 扫描件建索引的入口。放在搜索空态里，所以沿用 extras-empty 的排版，
+ * 只把按钮的左内边距对齐到同一列——不然按钮会顶到抽屉边缘。
+ */
+.ocr-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-3) var(--sp-3);
+}
+
+.ocr-cta .extras-empty {
+  padding-bottom: 0;
+}

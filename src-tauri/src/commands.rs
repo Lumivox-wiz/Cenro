@@ -2068,6 +2068,199 @@ mod annotation_dedupe_tests {
     }
 }
 
+// ---------------- 扫描件 OCR ----------------
+//
+// 图片由前端 pdf.js 渲染后传进来（Rust 侧没有 PDF 引擎），这里只做「认字 + 落库」。
+// 逐页调用而不是整本一次：单页失败不会拖垮整本，进度也能按页汇报。
+
+#[derive(serde::Serialize)]
+pub struct OcrInfo {
+    /// 模型已内嵌进二进制，正常情况恒为 true；留给「将来换成外置模型」用
+    ready: bool,
+    bytes: u64,
+    engine: String,
+}
+
+#[tauri::command]
+pub fn ocr_info(state: State<'_, AppState>) -> OcrInfo {
+    OcrInfo {
+        ready: true,
+        bytes: state.ocr.models_bytes(),
+        engine: crate::ocr::ENGINE_ID.to_string(),
+    }
+}
+
+#[derive(serde::Serialize)]
+pub struct OcrStatus {
+    total: i64,
+    done: i64,
+    status: String,
+    /// 已落库的页数（可能大于 done：换模型重跑时会先清）
+    pages: i64,
+}
+
+fn read_status(conn: &rusqlite::Connection, id: &str) -> Result<OcrStatus> {
+    let pages: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM ocr_pages WHERE book_id = ?1",
+            [id],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    let job = conn
+        .query_row(
+            "SELECT total, done, status FROM ocr_jobs WHERE book_id = ?1",
+            [id],
+            |r| {
+                Ok(OcrStatus {
+                    total: r.get(0)?,
+                    done: r.get(1)?,
+                    status: r.get(2)?,
+                    pages,
+                })
+            },
+        )
+        .optional()?;
+    Ok(job.unwrap_or(OcrStatus {
+        total: 0,
+        done: 0,
+        status: "idle".into(),
+        pages,
+    }))
+}
+
+#[tauri::command]
+pub fn ocr_status(state: State<'_, AppState>, id: String) -> Result<OcrStatus> {
+    visible_book(&state, &id)?;
+    let conn = state.db.lock().map_err(|_| AppError::Other("数据库忙".into()))?;
+    read_status(&conn, &id)
+}
+
+/// 开始建索引：清掉旧结果、记下总页数。
+///
+/// 换模型重跑也走这里——`ocr_pages` 先清空，避免新旧模型的结果混在一张表里。
+#[tauri::command]
+pub fn ocr_begin(state: State<'_, AppState>, id: String, total: i64) -> Result<OcrStatus> {
+    visible_book(&state, &id)?;
+    let conn = state.db.lock().map_err(|_| AppError::Other("数据库忙".into()))?;
+    crate::ocr::clear_book(&conn, &id)?;
+    conn.execute(
+        "INSERT INTO ocr_jobs (book_id, total, done, status, engine, updated_at)
+         VALUES (?1, ?2, 0, 'running', ?3, ?4)
+         ON CONFLICT(book_id) DO UPDATE SET
+           total = excluded.total, done = 0, status = 'running',
+           engine = excluded.engine, updated_at = excluded.updated_at",
+        rusqlite::params![id, total, crate::ocr::ENGINE_ID, crate::ocr::now_secs()],
+    )?;
+    read_status(&conn, &id)
+}
+
+#[derive(serde::Serialize)]
+pub struct OcrPageResult {
+    chars: i64,
+    done: i64,
+}
+
+/// 识别一页并落库。`jpeg` 是 base64（前端 `canvas.toDataURL` 去掉前缀后的部分）。
+#[tauri::command]
+pub fn ocr_page(
+    state: State<'_, AppState>,
+    id: String,
+    page: i64,
+    jpeg: String,
+) -> Result<OcrPageResult> {
+    use base64::Engine as _;
+    visible_book(&state, &id)?;
+
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(jpeg.as_bytes())
+        .map_err(|e| AppError::Other(format!("图片解码失败：{e}")))?;
+    let img = image::load_from_memory(&bytes)?;
+
+    // 识别期间不放数据库锁：一页要几百毫秒，锁着会卡住别处的读写
+    let text = state.ocr.recognize(&img)?;
+
+    let conn = state.db.lock().map_err(|_| AppError::Other("数据库忙".into()))?;
+    crate::ocr::save_page(&conn, &id, page, &text)?;
+    conn.execute(
+        "UPDATE ocr_jobs SET done = (SELECT COUNT(*) FROM ocr_pages WHERE book_id = ?1),
+                updated_at = ?2 WHERE book_id = ?1",
+        rusqlite::params![id, crate::ocr::now_secs()],
+    )?;
+    let done: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM ocr_pages WHERE book_id = ?1",
+            [&id],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    Ok(OcrPageResult {
+        chars: text.chars().count() as i64,
+        done,
+    })
+}
+
+#[tauri::command]
+pub fn ocr_finish(state: State<'_, AppState>, id: String, status: String) -> Result<OcrStatus> {
+    visible_book(&state, &id)?;
+    let conn = state.db.lock().map_err(|_| AppError::Other("数据库忙".into()))?;
+    conn.execute(
+        "UPDATE ocr_jobs SET status = ?2, updated_at = ?3 WHERE book_id = ?1",
+        rusqlite::params![id, status, crate::ocr::now_secs()],
+    )?;
+    read_status(&conn, &id)
+}
+
+#[derive(serde::Serialize)]
+pub struct OcrHit {
+    pub page: i64,
+    pub snippet: String,
+}
+
+/// 在已建索引的页里找词。大小写与全角按「去空白后包含」粗略匹配即可——
+/// 扫描件的文本本来就有零星错字，严格匹配反而让用户搜不到。
+#[tauri::command]
+pub fn ocr_search(state: State<'_, AppState>, id: String, query: String) -> Result<Vec<OcrHit>> {
+    visible_book(&state, &id)?;
+    let needle = query.trim().to_lowercase();
+    if needle.is_empty() {
+        return Ok(Vec::new());
+    }
+    let conn = state.db.lock().map_err(|_| AppError::Other("数据库忙".into()))?;
+    let mut stmt =
+        conn.prepare("SELECT page, text FROM ocr_pages WHERE book_id = ?1 ORDER BY page")?;
+    let rows = stmt.query_map([&id], |r| {
+        Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))
+    })?;
+
+    let mut hits = Vec::new();
+    for row in rows {
+        let (page, text) = row?;
+        let lowered = text.to_lowercase();
+        if let Some(pos) = lowered.find(&needle) {
+            // 片段取命中点前后各 24 个字，太长在面板里放不下
+            let chars: Vec<char> = text.chars().collect();
+            let at = lowered[..pos].chars().count();
+            let start = at.saturating_sub(24);
+            let end = (at + needle.chars().count() + 24).min(chars.len());
+            let snippet = chars[start..end].iter().collect::<String>().replace('\n', " ");
+            hits.push(OcrHit { page, snippet });
+            if hits.len() >= 100 {
+                break;
+            }
+        }
+    }
+    Ok(hits)
+}
+
+#[tauri::command]
+pub fn ocr_clear(state: State<'_, AppState>, id: String) -> Result<()> {
+    visible_book(&state, &id)?;
+    let conn = state.db.lock().map_err(|_| AppError::Other("数据库忙".into()))?;
+    crate::ocr::clear_book(&conn, &id)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod cover_rebuild_tests {
     use super::*;

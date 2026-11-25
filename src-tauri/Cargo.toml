@@ -37,6 +37,9 @@ sevenz-rust = "0.6.1"
 base64 = "0.23.1"
 unrar-rs = { version = "0.16.1", default-features = false, features = ["crypto-rust"] }
 pulldown-cmark = { version = "0.13.6", default-features = false, features = ["html"] }
+# 扫描件 OCR：PP-OCRv6 tiny 走 ONNX Runtime，静态链接进产物（不额外带 dll/so）。
+# 模型在 resources/ocr/，见 docs/OCR_RESEARCH.md 的选型与实测。
+paddleocr_rs_onnx = "0.2.8"
 # 备份文件名与「上次备份」都按本地时区显示；std 没有时区信息，只能借 chrono
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 # 隐私书架的 PIN：只存 Argon2id 的 PHC 字符串，不存明文/简单哈希

@@ -22,6 +22,7 @@ mod xlsx;
 mod db;
 mod error;
 mod models;
+mod ocr;
 mod rtf;
 mod search;
 mod startup;
@@ -60,6 +61,8 @@ pub struct AppState {
     pub startup_book: Mutex<Option<String>>,
     /// 隐私书架：解锁态只存内存，进程结束即上锁
     pub privacy: Mutex<privacy::Session>,
+    /// 扫描件 OCR：模型内嵌，引擎首次用到时才初始化
+    pub ocr: ocr::Ocr,
     /// privacy.json 的内存副本。`unlocked()` 会被每次翻页调用，
     /// 在那里读一遍文件太亏，所以启动时读一次、写的时候同步更新。
     pub privacy_config: Mutex<privacy::PrivacyConfig>,
@@ -297,6 +300,7 @@ pub fn run() {
                 data_dir,
                 backup_dir,
                 startup_book: Mutex::new(None),
+                ocr: ocr::Ocr::new(),
                 privacy: Mutex::new(privacy::Session::default()),
                 privacy_config: Mutex::new(privacy_config),
             });
@@ -396,6 +400,13 @@ pub fn run() {
             commands::set_book_tags,
             commands::delete_tag,
             commands::search_book,
+            commands::ocr_info,
+            commands::ocr_status,
+            commands::ocr_begin,
+            commands::ocr_page,
+            commands::ocr_finish,
+            commands::ocr_search,
+            commands::ocr_clear,
             commands::export_annotations,
             commands::import_annotations,
             commands::log_frontend,

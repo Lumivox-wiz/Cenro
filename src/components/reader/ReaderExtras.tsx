@@ -59,6 +59,11 @@ interface Props {
   onSearch?: (query: string, report: (done: number, total: number) => void) => Promise<SearchHit[]>;
   /** 搜不到时的说明。PDF 与文字书原因不同，别用同一句 */
   searchEmptyHint?: string;
+  /**
+   * 空态下面的附加内容。扫描件 PDF 用它放「建立文字索引」的按钮与进度；
+   * 面板不该知道 OCR 这件事，交给阅读器塞一个节点进来。
+   */
+  emptyExtra?: React.ReactNode;
   /** 标注增删改之后通知阅读器重画划线——面板只管列表，正文不归它管 */
   onChanged?: () => void;
   /**
@@ -143,6 +148,7 @@ export default function ReaderExtras({
   onChanged,
   onSearch,
   searchEmptyHint,
+  emptyExtra,
 }: Props) {
   const trap = useFocusTrap(true);
   const [items, setItems] = useState<Annotation[]>([]);
@@ -662,9 +668,12 @@ export default function ReaderExtras({
                 </p>
               )}
               {!searching && hits?.length === 0 && (
-                <p className="extras-empty">
-                  没有找到「{query.trim()}」。{searchEmptyHint ?? ""}
-                </p>
+                <>
+                  <p className="extras-empty">
+                    没有找到「{query.trim()}」。{searchEmptyHint ?? ""}
+                  </p>
+                  {emptyExtra}
+                </>
               )}
               {!searching &&
                 hits?.map((hit, i) => (

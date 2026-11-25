@@ -75,6 +75,28 @@ CREATE TABLE IF NOT EXISTS book_tags (
 
 CREATE INDEX IF NOT EXISTS idx_book_tags_tag ON book_tags(tag);
 
+-- 扫描件的文字索引：一页一行，按页存便于断点续跑与增量重建。
+-- 只存识别出的纯文本，不存坐标——搜索只需要「跳到哪一页」。
+CREATE TABLE IF NOT EXISTS ocr_pages (
+  book_id  TEXT NOT NULL,
+  page     INTEGER NOT NULL,          -- 0 基，与 PDF 页码一致
+  text     TEXT NOT NULL,
+  chars    INTEGER NOT NULL,
+  engine   TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (book_id, page)
+);
+
+-- 一本书一条任务记录。done 是「已完成页数」，用来在面板上显示进度。
+CREATE TABLE IF NOT EXISTS ocr_jobs (
+  book_id  TEXT PRIMARY KEY,
+  total    INTEGER NOT NULL,
+  done     INTEGER NOT NULL DEFAULT 0,
+  status   TEXT NOT NULL,             -- queued / running / done / failed / cancelled
+  engine   TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS library_roots (
   id       INTEGER PRIMARY KEY AUTOINCREMENT,
   path     TEXT NOT NULL UNIQUE,
