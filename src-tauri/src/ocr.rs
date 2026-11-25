@@ -127,6 +127,52 @@ pub fn clear_book(conn: &rusqlite::Connection, book_id: &str) -> Result<()> {
     Ok(())
 }
 
+/// 在识别文本里找词，返回命中处的片段（前后各 `PAD` 个字符）。
+///
+/// 为什么不能直接 `text.contains(needle)`：OCR 出来的中文经常带空格
+/// （实测封面页是「天 津科 技大 学研 究生」），英文又常常没有词间空格
+/// （「keyelementsof」）。两种方向都会让「明明页上有这几个字，搜不到」成立，
+/// 所以**两边都去掉空白再比**，命中位置再映射回原文取片段。
+pub fn find_in_page(text: &str, needle: &str, pad: usize) -> Option<String> {
+    let needle: String = needle
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .flat_map(|c| c.to_lowercase())
+        .collect();
+    if needle.is_empty() {
+        return None;
+    }
+
+    let chars: Vec<char> = text.chars().collect();
+    let mut compact = String::with_capacity(text.len());
+    // compact 的第 i 个字符 → chars 里的下标；取片段时靠它还原原文
+    let mut map: Vec<usize> = Vec::with_capacity(text.len());
+    for (i, c) in chars.iter().enumerate() {
+        if c.is_whitespace() {
+            continue;
+        }
+        // 小写化可能一对多（İ 之类），只取第一个，保证 compact 与 map 一一对应
+        if let Some(lc) = c.to_lowercase().next() {
+            compact.push(lc);
+            map.push(i);
+        }
+    }
+
+    let pos = compact.find(&needle)?;
+    let hit_at = compact[..pos].chars().count();
+    let hit_len = needle.chars().count();
+    let start = map.get(hit_at).copied()?.saturating_sub(pad);
+    let last = map.get(hit_at + hit_len - 1).copied().unwrap_or(start);
+    let end = (last + 1 + pad).min(chars.len());
+    Some(
+        chars[start..end]
+            .iter()
+            .collect::<String>()
+            .replace('\n', " ")
+            .replace(['\r', '\t'], " "),
+    )
+}
+
 pub fn now_secs() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -151,6 +197,21 @@ mod tests {
         let chars = text.chars().count();
         assert!(chars > 40, "识别结果太少（{chars} 字）：{text}");
         eprintln!("[样本] {chars} 字，前 60 字：{}", text.chars().take(60).collect::<String>());
+    }
+
+    #[test]
+    fn find_tolerates_spaces_and_case() {
+        // OCR 给中文插空格
+        assert!(find_in_page("天 津科 技大 学研 究生", "天津科技大学", 4).is_some());
+        // 英文没有词间空格
+        assert!(find_in_page("materialsasoneofthekeyelementsof", "key elements of", 4).is_some());
+        // 大小写
+        assert!(find_in_page("Abstract", "abstract", 4).is_some());
+        // 原文里没有就是没有
+        assert!(find_in_page("第一页", "第二页", 4).is_none());
+        // 片段要能从原文还原（带上下文）
+        let snip = find_in_page("前文命中后文", "命中", 1).unwrap();
+        assert_eq!(snip, "文命中后");
     }
 
     #[test]

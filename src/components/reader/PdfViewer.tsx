@@ -400,6 +400,52 @@ export default function PdfViewer({
    * 逐页取 `getTextContent()`、拼接、压缩空白、找子串。
    * 扫描件没有文字片段，结果自然为空——调用方用 `searchEmptyHint` 解释这一点。
    */
+  // ---- 扫描件的文字索引 ----
+  // 打开扫描件时不去打扰用户，入口只在搜索面板的空态里
+  const [ocrStatus, setOcrStatus] = useState<OcrStatus | null>(null);
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState({ done: 0, total: 0 });
+  const ocrCancel = useRef(false);
+  const ocrPages = ocrStatus?.pages ?? 0;
+
+  useEffect(() => {
+    if (!doc) return;
+    let alive = true;
+    ocrApi
+      .status(book.id)
+      .then((st) => {
+        if (alive) setOcrStatus(st);
+      })
+      .catch(() => {
+        /* 浏览器里跑（没有后端）时静默跳过 */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [book.id, doc]);
+
+  /** 逐页渲染 + 识别。取消只影响「后面还没做的页」，已完成的留在库里 */
+  const buildOcrIndex = useCallback(async () => {
+    if (!doc || ocrBusy) return;
+    setOcrBusy(true);
+    ocrCancel.current = false;
+    setOcrProgress({ done: 0, total: doc.numPages });
+    try {
+      const final = await buildIndex({
+        doc,
+        bookId: book.id,
+        onProgress: (done, total) => setOcrProgress({ done, total }),
+        isCancelled: () => ocrCancel.current,
+      });
+      setOcrStatus(final);
+    } catch (e) {
+      logError(`建立 OCR 索引失败：${e instanceof Error ? e.message : String(e)}`);
+      setMarkNotice("建立索引失败，详见日志");
+    } finally {
+      setOcrBusy(false);
+    }
+  }, [book.id, doc, ocrBusy]);
+
   const searchPdf = useCallback(
     async (
       query: string,
@@ -447,12 +493,19 @@ export default function PdfViewer({
         if (hits.length >= limit) break;
       }
 
-      // 文字层没命中、但这本书建过索引：到 OCR 那批页里再找一遍。
-      // 扫描件本来没有文字层，不接这一步索引就白建了。
-      if (hits.length === 0) {
+      /*
+       * 建过索引的话，把 OCR 那批页的结果并进来。
+       *
+       * 索引只覆盖「没有文字层」的页，所以两边不会重复；混合型 PDF（论文、说明书）
+       * 正好各出一半——只在扫描页出现的词也能搜到，不必等文字层先落空。
+       */
+      if (ocrPages > 0) {
         try {
           const found = await ocrApi.search(book.id, q);
+          const seen = new Set(hits.map((h) => h.chapter));
           for (const h of found) {
+            if (seen.has(h.page)) continue;
+            seen.add(h.page);
             hits.push({
               chapter: h.page,
               chapter_title: `第 ${h.page + 1} 页`,
@@ -475,54 +528,8 @@ export default function PdfViewer({
       }
       return hits;
     },
-    [book.id, doc, fitWidth, mode, spread, zoom],
+    [book.id, doc, fitWidth, mode, spread, zoom, ocrPages],
   );
-
-  // ---- 扫描件的文字索引 ----
-  // 打开扫描件时不去打扰用户，入口只在搜索面板的空态里
-  const [ocrStatus, setOcrStatus] = useState<OcrStatus | null>(null);
-  const [ocrBusy, setOcrBusy] = useState(false);
-  const [ocrProgress, setOcrProgress] = useState({ done: 0, total: 0 });
-  const ocrCancel = useRef(false);
-  const ocrPages = ocrStatus?.pages ?? 0;
-
-  useEffect(() => {
-    if (!doc) return;
-    let alive = true;
-    ocrApi
-      .status(book.id)
-      .then((st) => {
-        if (alive) setOcrStatus(st);
-      })
-      .catch(() => {
-        /* 浏览器里跑（没有后端）时静默跳过 */
-      });
-    return () => {
-      alive = false;
-    };
-  }, [book.id, doc]);
-
-  /** 逐页渲染 + 识别。取消只影响「后面还没做的页」，已完成的留在库里 */
-  const buildOcrIndex = useCallback(async () => {
-    if (!doc || ocrBusy) return;
-    setOcrBusy(true);
-    ocrCancel.current = false;
-    setOcrProgress({ done: 0, total: doc.numPages });
-    try {
-      const final = await buildIndex({
-        doc,
-        bookId: book.id,
-        onProgress: (done, total) => setOcrProgress({ done, total }),
-        isCancelled: () => ocrCancel.current,
-      });
-      setOcrStatus(final);
-    } catch (e) {
-      logError(`建立 OCR 索引失败：${e instanceof Error ? e.message : String(e)}`);
-      setMarkNotice("建立索引失败，详见日志");
-    } finally {
-      setOcrBusy(false);
-    }
-  }, [book.id, doc, ocrBusy]);
 
   const [marks, setMarks] = useState<Annotation[]>([]);
   const [markBusy, setMarkBusy] = useState(false);
@@ -1112,7 +1119,15 @@ export default function PdfViewer({
                 </button>
               </div>
             ) : ocrPages > 0 ? (
-              <p className="extras-empty">已为 {ocrPages} 页建立索引，可以直接搜。</p>
+              <div className="ocr-cta">
+                <p className="extras-empty">已为 {ocrPages} 页建立索引，可以直接搜。</p>
+                <button
+                  className="btn btn-secondary extras-add"
+                  onClick={() => void buildOcrIndex()}
+                >
+                  重新建立
+                </button>
+              </div>
             ) : (
               <div className="ocr-cta">
                 <p className="extras-empty">建一次文字索引就能搜扫描件，几十秒，之后永久有效。</p>

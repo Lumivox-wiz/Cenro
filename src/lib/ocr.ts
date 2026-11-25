@@ -10,6 +10,7 @@
 import "../styles/ocr.css";
 import { invoke } from "@tauri-apps/api/core";
 import type { PDFDocumentProxy } from "pdfjs-dist";
+import { extractFlatText } from "./pdfText";
 
 export type OcrStatus = {
   total: number;
@@ -83,8 +84,12 @@ export type BuildOptions = {
 /**
  * 建整本索引。返回最终状态；中途取消返回 `cancelled`。
  *
- * 单页出错不中断：那页留空（搜索里就是没命中），继续下一页——
- * 扫描件里偶尔有整页广告或纯图，为一页放弃整本不值得。
+ * 两个「不做什么」比「做什么」更重要：
+ * - **能搜的页直接跳过**。混合型 PDF（论文、说明书）里大半页本来就有文字层，
+ *   再识别一遍既费时又会让同一个词出现两次。判据是「每页 ≥ 40 字**且**不是乱码」——
+ *   知网那类扫描件的自动 OCR 层全是一片全角字母，字数够但搜不到，必须照样识别。
+ * - **单页出错不中断**。那页留空，继续下一页——扫描件里偶尔夹整页广告或纯图，
+ *   为一页放弃整本不值得。
  */
 export async function buildIndex({
   doc,
@@ -96,20 +101,57 @@ export async function buildIndex({
   await ocrApi.begin(bookId, total);
   onProgress?.(0, total);
 
+  const TEXT_LAYER_MIN = 40;
+
   for (let n = 1; n <= total; n += 1) {
     if (isCancelled?.()) {
       return ocrApi.finish(bookId, "cancelled");
     }
     try {
-      const jpeg = await renderPageJpeg(doc, n);
-      const res = await ocrApi.page(bookId, n - 1, jpeg);
-      onProgress?.(res.done, total);
+      // 先问 pdf.js 这页有没有文字层：有就不用识别，省时也免得重复命中
+      const page = await doc.getPage(n);
+      const content = await page.getTextContent();
+      const flat = extractFlatText(
+        content.items as unknown as Array<{ str?: string; hasEOL?: boolean }>,
+      ).flat;
+      page.cleanup();
+      // 有文字层且不像噪声才跳过；文字层是乱码的页照样要识别
+      if (flat.trim().length >= TEXT_LAYER_MIN && !looksGarbled(flat)) {
+        onProgress?.(n, total);
+        continue;
+      }
     } catch {
-      // 这一页失败就跳过，进度按「已落库页数」走，不假装成功
+      /* 取文字层失败就照常识别，别因为探测把这一页丢掉 */
+    }
+    try {
+      const jpeg = await renderPageJpeg(doc, n);
+      await ocrApi.page(bookId, n - 1, jpeg);
+      onProgress?.(n, total);
+    } catch {
+      // 这一页失败就跳过，进度照常前进，不假装成功
       onProgress?.(n, total);
     }
   }
   return ocrApi.finish(bookId, "done");
+}
+
+/**
+ * 文字层是不是「有字但不可信」。
+ *
+ * 知网那类扫描件常带一版自动 OCR 的文字层，取出来是一片全角拉丁字母
+ * （`－ｃａｒｂｏ打ｍａｔｅｒ`）——字数够、搜不到任何正常词，比没有文字层更坑。
+ * 判据只看全角 ASCII 的占比：正经排版里全角字母极少，超过三成就当它是噪声。
+ */
+export function looksGarbled(text: string): boolean {
+  const chars = [...text.replace(/\s+/g, "")];
+  if (chars.length === 0) return false;
+  let wide = 0;
+  for (const ch of chars) {
+    const c = ch.codePointAt(0) ?? 0;
+    // 全角 ASCII（！-～）与替换符，都是「这段字没救」的信号
+    if ((c >= 0xff01 && c <= 0xff5e) || c === 0xfffd) wide += 1;
+  }
+  return wide / chars.length > 0.3;
 }
 
 /** 这本 PDF 是不是「基本上没有文字层」——判据与搜索面板的提示一致。 */

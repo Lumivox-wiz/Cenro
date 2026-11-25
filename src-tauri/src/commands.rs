@@ -2222,7 +2222,7 @@ pub struct OcrHit {
 #[tauri::command]
 pub fn ocr_search(state: State<'_, AppState>, id: String, query: String) -> Result<Vec<OcrHit>> {
     visible_book(&state, &id)?;
-    let needle = query.trim().to_lowercase();
+    let needle = query.trim().to_string();
     if needle.is_empty() {
         return Ok(Vec::new());
     }
@@ -2236,14 +2236,7 @@ pub fn ocr_search(state: State<'_, AppState>, id: String, query: String) -> Resu
     let mut hits = Vec::new();
     for row in rows {
         let (page, text) = row?;
-        let lowered = text.to_lowercase();
-        if let Some(pos) = lowered.find(&needle) {
-            // 片段取命中点前后各 24 个字，太长在面板里放不下
-            let chars: Vec<char> = text.chars().collect();
-            let at = lowered[..pos].chars().count();
-            let start = at.saturating_sub(24);
-            let end = (at + needle.chars().count() + 24).min(chars.len());
-            let snippet = chars[start..end].iter().collect::<String>().replace('\n', " ");
+        if let Some(snippet) = crate::ocr::find_in_page(&text, &needle, 24) {
             hits.push(OcrHit { page, snippet });
             if hits.len() >= 100 {
                 break;
