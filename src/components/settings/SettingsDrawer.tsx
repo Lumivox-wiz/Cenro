@@ -14,20 +14,20 @@ import {
 } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { cacheApi, type CacheReport } from "../../api";
-import { DEFAULT_PREFS, type Prefs } from "../../lib/prefs";
+import { type Prefs } from "../../lib/prefs";
 import type { LibraryStats } from "../../lib/stats";
 import { useFocusTrap } from "../../lib/useFocusTrap";
 import { IS_MOBILE } from "../../lib/platform";
 import type { LibraryRoot } from "../../types";
 import Dialog from "../ui/Dialog";
 import AboutSettings from "./AboutSettings";
-import BackgroundSettings from "./BackgroundSettings";
+import BackgroundSettings, { BACKGROUND_RESET } from "./BackgroundSettings";
 import BackupSettings from "./BackupSettings";
 import PrivacySettings from "./PrivacySettings";
 import LibrarySettings from "./LibrarySettings";
-import ReadingSettings from "./ReadingSettings";
+import ReadingSettings, { READING_RESET } from "./ReadingSettings";
 import ShortcutsSettings from "./ShortcutsSettings";
-import ThemeSettings from "./ThemeSettings";
+import ThemeSettings, { THEME_RESET } from "./ThemeSettings";
 import { THEME_OPTIONS, optionLabel } from "./shared";
 import type { GroupId } from "./shared";
 
@@ -65,27 +65,17 @@ const GROUPS: { id: GroupId; label: string; icon: LucideIcon }[] = [
 ];
 
 /**
- * 「恢复默认」只重置该组自己的键（UX §8.2）。
+ * 「恢复本页默认」只重置该组自己的键（UX §8.2）。
  * 书库 / 快捷键 / 关于没有可回退的偏好，故不出现在这张表里，也就不显示按钮。
+ *
+ * 表里的值**不在这个文件里定义**：每一页自己导出自己的全集，见各 *Settings.tsx 里的
+ * `*_RESET`。外壳只做索引。原来这里手抄了一份，阅读页那 12 个键抄成了 7 个
+ * （字体、段距、页边距全漏），用户点了按钮正文纹丝不动——单抄一份就等于埋一次雷。
  */
 const RESET_PATCH: Partial<Record<GroupId, Partial<Prefs>>> = {
-  reading: {
-    readerFontSize: DEFAULT_PREFS.readerFontSize,
-    readerLineHeight: DEFAULT_PREFS.readerLineHeight,
-    readerPageWidth: DEFAULT_PREFS.readerPageWidth,
-    spreadMode: DEFAULT_PREFS.spreadMode,
-    pdfMode: DEFAULT_PREFS.pdfMode,
-    spreadCover: DEFAULT_PREFS.spreadCover,
-    comicDirHint: DEFAULT_PREFS.comicDirHint,
-  },
-  theme: {
-    theme: DEFAULT_PREFS.theme,
-    readerTheme: DEFAULT_PREFS.readerTheme,
-  },
-  background: {
-    background: DEFAULT_PREFS.background,
-    monet: DEFAULT_PREFS.monet,
-  },
+  reading: READING_RESET,
+  theme: THEME_RESET,
+  background: BACKGROUND_RESET,
 };
 
 /**
@@ -286,10 +276,16 @@ export default function SettingsDrawer({
                     <span className="settings-item-icon" aria-hidden="true">
                       <Icon size={18} strokeWidth={1.8} />
                     </span>
-                    <span className="settings-item-text">
-                      <span className="settings-item-label">{label}</span>
-                      <span className="settings-item-summary">{summary(id)}</span>
-                    </span>
+                    {/*
+                     * 单行：标签在左，当前值在右。
+                     *
+                     * 原来是「图标 + 标签/摘要两行 + 箭头」，有摘要的行 56px、
+                     * 没摘要的 52px，一列里两种行高，读起来不像一张表。
+                     * 值挪到右侧后每一行同高，扫读时眼睛只沿一条竖线走，
+                     * 空的那些行也不会矮一截（本来就空着，不是缺了什么）。
+                     */}
+                    <span className="settings-item-label">{label}</span>
+                    <span className="settings-item-value">{summary(id)}</span>
                     <ChevronRight
                       className="settings-item-chevron"
                       size={16}

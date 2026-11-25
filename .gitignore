@@ -63,6 +63,7 @@ docs/SIMPLIFICATION_PLAN.md
 docs/DOC_CONFLICT_AUDIT.md
 docs/DOC_CONFLICT_VERIFY.md
 docs/UI_REVIEW.md
+docs/UI_AUDIT_R5.md
 docs/UI_TRANSLUCENCE_PLAN.md
 docs/IMPLEMENTATION_NOTES.md
 docs/FORMAT_RESEARCH.md
@@ -75,3 +76,9 @@ docs/archive/
 
 # 宣传素材（朋友圈卡片、海报、二维码、出图脚本）：只在本地用，不进仓库
 docs/promo/
+
+# OCR 研究：报告与本地基准环境，不进仓库
+docs/OCR_RESEARCH.md
+.ocr-venv/
+.ocr-venv
+.ocr-spike/

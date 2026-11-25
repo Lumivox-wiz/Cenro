@@ -3,9 +3,23 @@ import { invoke } from "@tauri-apps/api/core";
 import { ChevronRight, Ruler, Scale, ScrollText } from "lucide-react";
 import logoUrl from "../../assets/logo-mark.svg";
 import { licenseApi, type LicenseText } from "../../api";
+import { CATEGORY_FORMATS, CATEGORY_LABEL, type CategoryKey } from "../../lib/filters";
+import { FORMAT_LABEL } from "../../types";
 import Dialog from "../ui/Dialog";
 import LayoutProbe from "../dev/LayoutProbe";
 import type { GroupId } from "./shared";
+
+/**
+ * 关于页的格式清单：按侧栏的族分组，只有「文档」与「PDF」并成一行。
+ *
+ * 分开列 PDF 会得到「PDF ─ PDF」这种自我重复；其余四行与侧栏用词完全一致。
+ */
+const ABOUT_FAMILIES: { label: string; keys: CategoryKey[] }[] = [
+  { label: CATEGORY_LABEL.text, keys: ["text"] },
+  { label: CATEGORY_LABEL.ebook, keys: ["ebook"] },
+  { label: `${CATEGORY_LABEL.doc}与 ${CATEGORY_LABEL.pdf}`, keys: ["doc", "pdf"] },
+  { label: CATEGORY_LABEL.comic, keys: ["comic"] },
+];
 
 interface Props {
   version: string;
@@ -156,19 +170,24 @@ export default function AboutSettings({ version, onNavigate }: Props) {
       )}
 
       <section className="about-card">
-          <div className="about-row">
-            <span className="about-row-label">小说</span>
-            <span className="about-row-value">TXT · MD · HTML · EPUB · MOBI · AZW3 · FB2</span>
+        {/*
+         * 格式清单与侧栏分类**同源**（filters.ts 的 CATEGORY_FORMATS）。
+         *
+         * 原先这里手写「小说 / 漫画 / 文档」，侧栏用的是「文本 / 电子书 / 文档 /
+         * 漫画 / PDF」——同一个概念两套词。现在按侧栏的族生成，只在展示上把
+         * 「文档」与「PDF」并成一行：两者都是文档，分开列会出现「PDF ─ PDF」。
+         */}
+        {ABOUT_FAMILIES.map(({ label, keys }) => (
+          <div className="about-row" key={label}>
+            <span className="about-row-label">{label}</span>
+            <span className="about-row-value">
+              {keys
+                .flatMap((key) => CATEGORY_FORMATS[key].map((f) => FORMAT_LABEL[f]))
+                .join(" · ")}
+            </span>
           </div>
-          <div className="about-row">
-            <span className="about-row-label">漫画</span>
-            <span className="about-row-value">CBZ · CBR · CBT · CB7 · ZIP · 图片文件夹 · 图片型 MOBI</span>
-          </div>
-          <div className="about-row">
-            <span className="about-row-label">文档</span>
-            <span className="about-row-value">PDF · OFD · DOCX · RTF · MHTML · XLSX</span>
-          </div>
-        </section>
+        ))}
+      </section>
     </>
   );
 }

@@ -1,9 +1,15 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 interface Props {
   x: number;
   y: number;
-  /** 用于贴边内收。菜单项固定，宽高由调用方给常量即可 */
+  /**
+   * 贴边内收用的**估算**宽高。
+   *
+   * 挂载后会以实测尺寸再夹一次：菜单宽度由 CSS 决定、高度随条目数与分组标题变化，
+   * 调用方给的常量迟早对不上（顶栏的分类菜单传 168，而 `.book-menu` 实际 216）。
+   * 估错不影响正确性，只是首帧可能闪一下位置——所以调用方仍该给一个接近的值。
+   */
   width: number;
   height: number;
   label?: string;
@@ -32,9 +38,17 @@ export default function MenuShell({
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: x, top: y });
 
-  useEffect(() => {
-    const left = Math.min(x, window.innerWidth - width - 8);
-    const top = Math.min(y, window.innerHeight - height - 8);
+  /*
+   * 首帧之前按实测尺寸夹一次：用 useLayoutEffect 而不是 useEffect，
+   * 这样浏览器还没绘制就被摆到正确位置，不会出现「先跳出屏幕再缩回来」的一帧。
+   */
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const w = el.offsetWidth || width;
+    const h = el.offsetHeight || height;
+    const left = Math.min(x, window.innerWidth - w - 8);
+    const top = Math.min(y, window.innerHeight - h - 8);
     setPos({ left: Math.max(8, left), top: Math.max(8, top) });
   }, [x, y, width, height]);
 
@@ -78,7 +92,18 @@ export default function MenuShell({
     const onDown = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node)) onClose();
     };
-    const onScroll = () => onClose();
+    /*
+     * 菜单自己滚动时不能关。
+     *
+     * 捕获阶段能收到任意容器的 scroll，包括菜单内部那条——菜单一旦高过视口
+     * （顶栏的分类菜单在小屏上合并了排序与视图，会到 400px 以上），
+     * 用户滚动它就会被当成「页面滚了，锚点错位」而立刻收起，菜单等于滚不动。
+     */
+    const onScroll = (e: Event) => {
+      const target = e.target;
+      if (target instanceof Node && ref.current?.contains(target)) return;
+      onClose();
+    };
 
     window.addEventListener("keydown", onKey, true);
     window.addEventListener("mousedown", onDown);

@@ -803,6 +803,8 @@
 .card-target {
   display: flex;
   flex-direction: column;
+  /* 撑满卡片高度：进度条要能被推到卡片底边（见 .card-progress-row 的 margin-top:auto） */
+  flex: 1;
   /*
    * 四段信息不平均用力：封面与文字之间是「物 → 说明」，间距最大；
    * 书名与元信息是同一段里的主副行，几乎贴住；元信息与进度条再松一档。
@@ -1271,8 +1273,18 @@
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  /* 元信息与进度之间松一档：进度是「另一件事」，不是副行的延续 */
-  margin-top: var(--sp-2);
+  /*
+   * 弹性空隙放在**进度条之上**，而不是书名与作者之间。
+   *
+   * 原来靠 .card-title 的 min-height 把每张卡垫到两行高，单行书名的那几张
+   * 就在书名与作者之间留出一整行空白——「一本书 + 它的两个注脚」被切成 1+1+1。
+   * 现在书名与作者紧贴成一块，富余空间全部落到这块和进度条之间，
+   * 进度条仍然贴齐卡片底边，网格横向基线一点没变。
+   *
+   * padding 兜一个下限：两行书名把空间吃满时，进度条不能贴着作者。
+   */
+  margin-top: auto;
+  padding-top: var(--sp-2);
 }
 
 .card-progress-track {
@@ -1287,26 +1299,39 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--c-accent);
+  /*
+   * 默认中性灰，不是强调色。
+   *
+   * 一屏 4 条实心蓝横线时，强调色被摊平成「进度条的颜色」，
+   * 「我在读哪一本」这件事反而要靠读数字。现在强调色只留给
+   * data-emphasis 的那一本（App 里算出来的最近在读、且没读完的那本），
+   * 其余用描边色：仍然看得见、仍然能量长度，但不再抢视线。
+   * 对比度 3.30:1（亮色描边色对纸面），非文字元素的门槛是 3:1。
+   */
+  background: var(--c-border-strong);
   transition: background var(--dur-fast) var(--ease-out);
 }
 
-/*
- * 读完的书不再抢注意力。
- * 满宽的强调色进度条在暗色下是整屏最亮的东西，九张卡重复九次比书名还跳；
- * 99% 以上降到描边色，只留「有这本书、读完了」的信息，不留亮度。
- */
+/* 唯一一处强调色：正在读的那本 */
+.card-progress-track[data-emphasis] > span {
+  background: var(--c-accent);
+}
+
+/* 读完的：中性灰已经在默认值上，这条只是把语义写清楚，防止将来改默认色时漏掉 */
 .card-progress-track[data-done] > span {
   background: var(--c-border-strong);
 }
 
 /*
- * 悬停时进度略微提亮：卡片已经抬起，进度条跟着「醒」一点。
- * 排除读完的卡：它们的轨道是中性灰，一提亮就跳回强调色，
- * 「读完的书不抢注意力」这件事会在鼠标扫过时失效。
+ * 悬停时只让「正在读的那本」更亮一点；其余的仍走中性，
+ * 否则鼠标扫过时整屏又回到四条蓝线。
  */
-.book-card:hover .card-progress-track:not([data-done]) > span {
+.book-card:hover .card-progress-track[data-emphasis] > span {
   background: var(--c-accent-hover);
+}
+
+.book-card:hover .card-progress-track:not([data-done]):not([data-emphasis]) > span {
+  background: var(--c-text-tertiary);
 }
 
 .card-progress-pct {
@@ -1325,7 +1350,10 @@
   font-size: var(--fs-14);
   font-weight: 600;
   line-height: 1.3;
-  min-height: 2.6em;
+  /*
+   * 不再用 min-height 硬垫两行：它会把单行书名撑出一个空洞。
+   * 两行截断仍在（-webkit-line-clamp），卡片之间的对齐交给底部的进度条。
+   */
   color: var(--c-text-primary);
   overflow: hidden;
   display: -webkit-box;
@@ -1468,6 +1496,11 @@
 .row-progress-track span {
   display: block;
   height: 100%;
+  /* 与网格视图同口径：只有「正在读的那一本」走强调色 */
+  background: var(--c-border-strong);
+}
+
+.row-progress-track[data-emphasis] span {
   background: var(--c-accent);
 }
 
@@ -2323,7 +2356,31 @@ body,
   /* 材质由 .glass 提供；菜单压在卡片上，模糊能强化「浮在内容之上」的层次 */
   display: flex;
   flex-direction: column;
+  /*
+   * 高过视口时自己滚，而不是被裁掉一半。
+   * 语义菜单可以很长（顶栏的分类菜单在窄屏合并了排序与视图，12 行 ≈ 450px），
+   * 480px 高的横屏手机上不去管就会顶出屏幕。MenuShell 里的滚动守卫
+   * 已经放行「滚动源在菜单内部」的情况，这里只需要给出可滚的盒子。
+   */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   animation: menu-in var(--dur-fast) var(--ease-out);
+}
+
+/* 分组标题：只在菜单装了多组时出现（是否渲染由调用方决定） */
+.menu-group-label {
+  padding: var(--sp-2) var(--sp-2) var(--sp-1);
+  font-size: var(--fs-11);
+  color: var(--c-text-tertiary);
+  letter-spacing: 0.02em;
+}
+
+/* 分组分隔线：1px hairline，上下各留一档，不靠巨大间距分组 */
+.menu-sep {
+  height: 1px;
+  margin: 6px var(--sp-1);
+  background: var(--c-border-subtle);
 }
 
 /* 玻璃菜单的描边用中性 subtle：白玻璃上的白描边等于没有边界 */
@@ -2583,8 +2640,9 @@ body,
   align-items: center;
   gap: var(--sp-3);
   width: 100%;
-  min-height: 52px;
-  padding: var(--sp-2) var(--sp-3);
+  /* 单行定高：8 行必须一样高，否则这一列读起来不像一张表 */
+  height: 48px;
+  padding: 0 var(--sp-3);
   border: none;
   border-radius: var(--r-sm);
   background: none;
@@ -2614,26 +2672,32 @@ body,
   color: var(--c-text-secondary);
 }
 
-.settings-item-text {
+.settings-item-label {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.settings-item-label {
   font-size: var(--fs-14);
   color: var(--c-text-primary);
-}
-
-/* 摘要单行截断：目录路径长的时候不能把行撑高 */
-.settings-item-summary {
-  font-size: var(--fs-12);
-  color: var(--c-text-tertiary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+ * 当前值：右对齐一列。
+ *
+ * 不给固定宽度——最长也就「1 个目录」「衬线 18px」，让 flex 自己收；
+ * 但设了 max-width，避免某天塞进一个长路径把标签挤没。
+ */
+.settings-item-value {
+  flex: 0 1 auto;
+  max-width: 45%;
+  font-size: var(--fs-12);
+  color: var(--c-text-tertiary);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* 所有值按同一条右边界对齐：chevron 与它之间的间距由 gap 统一给 */
 }
 
 .settings-item-chevron {

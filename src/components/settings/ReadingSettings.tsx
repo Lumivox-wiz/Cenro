@@ -89,6 +89,42 @@ function FontPickerRow({
 }
 
 /**
+ * 三个组的默认值，**每个键只写一次**。
+ *
+ * 组标题右侧的「恢复默认」重置本组，页面底部的「恢复本页默认」重置三组之和
+ * （见下方 READING_RESET）。原来页面级那份是外壳里手写的另一张表，
+ * 只登记了 7 个键，字体、段距、页边距全都漏了 —— 用户点了按钮，正文纹丝不动。
+ * 两张表合成一张，这类漏登记在结构上就不可能再发生。
+ */
+const TEXT_RESET: Partial<Prefs> = {
+  readerFontSize: DEFAULT_PREFS.readerFontSize,
+  readerLineHeight: DEFAULT_PREFS.readerLineHeight,
+  readerPageWidth: DEFAULT_PREFS.readerPageWidth,
+  readerFont: DEFAULT_PREFS.readerFont,
+  readerFontCjk: DEFAULT_PREFS.readerFontCjk,
+  readerFontLatin: DEFAULT_PREFS.readerFontLatin,
+  readerParaGap: DEFAULT_PREFS.readerParaGap,
+  readerMargin: DEFAULT_PREFS.readerMargin,
+};
+
+const COMIC_RESET: Partial<Prefs> = {
+  spreadMode: DEFAULT_PREFS.spreadMode,
+  spreadCover: DEFAULT_PREFS.spreadCover,
+  comicDirHint: DEFAULT_PREFS.comicDirHint,
+};
+
+const PDF_RESET: Partial<Prefs> = {
+  pdfMode: DEFAULT_PREFS.pdfMode,
+};
+
+/** 本页全部可回退项 = 三组之和。页面级「恢复本页默认」读这一份。 */
+export const READING_RESET: Partial<Prefs> = {
+  ...TEXT_RESET,
+  ...COMIC_RESET,
+  ...PDF_RESET,
+};
+
+/**
  * 阅读子页：按「影响哪类内容」分成三组。
  *
  * 之前是「排版 / 漫画与 PDF」两段，单双页、PDF 模式、双页封面、方向提示全挤在
@@ -119,18 +155,7 @@ export default function ReadingSettings({ prefs, onPrefs }: SectionProps) {
       <Group
         title="正文排版"
         canReset={textChanged}
-        onReset={() =>
-          set({
-            readerFontSize: DEFAULT_PREFS.readerFontSize,
-            readerLineHeight: DEFAULT_PREFS.readerLineHeight,
-            readerPageWidth: DEFAULT_PREFS.readerPageWidth,
-            readerFont: DEFAULT_PREFS.readerFont,
-            readerParaGap: DEFAULT_PREFS.readerParaGap,
-            readerMargin: DEFAULT_PREFS.readerMargin,
-            readerFontCjk: DEFAULT_PREFS.readerFontCjk,
-            readerFontLatin: DEFAULT_PREFS.readerFontLatin,
-          })
-        }
+        onReset={() => set(TEXT_RESET)}
       >
         <OptionRow
           label="字体"
@@ -239,13 +264,7 @@ export default function ReadingSettings({ prefs, onPrefs }: SectionProps) {
       <Group
         title="漫画"
         canReset={comicChanged}
-        onReset={() =>
-          set({
-            spreadMode: DEFAULT_PREFS.spreadMode,
-            spreadCover: DEFAULT_PREFS.spreadCover,
-            comicDirHint: DEFAULT_PREFS.comicDirHint,
-          })
-        }
+        onReset={() => set(COMIC_RESET)}
       >
         {/* 手机宽度到不了双页阈值（1440px），这两项在手机上不生效 */}
         {!IS_MOBILE && (
@@ -290,7 +309,7 @@ export default function ReadingSettings({ prefs, onPrefs }: SectionProps) {
       <Group
         title="PDF"
         canReset={pdfChanged}
-        onReset={() => set({ pdfMode: DEFAULT_PREFS.pdfMode })}
+        onReset={() => set(PDF_RESET)}
       >
         <OptionRow
           label="阅读模式"

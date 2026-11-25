@@ -222,7 +222,15 @@ export default function ReaderShell({ book, prefs, onExit, onProgress, onOpenSet
     setPage(Math.min(pageCount - 1, Math.max(0, column)));
   }, [chapterMarks, content, mode, pageCount, pageWidth, scrollRef, columnsRef, setPage]);
 
-  const [chrome, setChrome] = useState(false);
+  /*
+   * 工具栏初始可见（v1.14）。
+   *
+   * 原来是 false：从书架点进一本书，屏幕上没有任何控件——没有返回、没有书名、
+   * 没有读到哪。中间点一下能唤出工具栏，但没有任何东西提示可以点。
+   * 首帧显示 3 秒再淡出（下面的 scheduleHide 已经在跑），只多说一次
+   * 「这个界面有控件」，之后恢复正常克制。
+   */
+  const [chrome, setChrome] = useState(true);
   const [tocOpen, setTocOpen] = useState(false);
   /** 书签 / 搜索面板；null 表示关闭 */
   const [extras, setExtras] = useState<ExtrasTab | null>(null);
@@ -273,17 +281,27 @@ export default function ReaderShell({ book, prefs, onExit, onProgress, onOpenSet
 
   useEffect(() => () => window.clearTimeout(repeatTimer.current), []);
 
+  /*
+   * 入场钉住：工具栏显隐会改正文让位，收起时整页重排。
+   * 这个重排若发生在用户刚开始读的第 3 秒，等于把他正在看的那一行抽走。
+   * 所以入场不设倒计时，用户第一次动作之后才恢复 3 秒自动隐藏。
+   */
+  const chromePinned = useRef(true);
+
   const scheduleHide = useCallback(() => {
+    if (chromePinned.current) return;
     window.clearTimeout(hideTimer.current);
     hideTimer.current = window.setTimeout(() => setChrome(false), 3000);
   }, []);
 
   const reveal = useCallback(() => {
+    chromePinned.current = false;
     setChrome(true);
     scheduleHide();
   }, [scheduleHide]);
 
   const pauseHide = useCallback(() => {
+    chromePinned.current = false;
     window.clearTimeout(hideTimer.current);
   }, []);
 
@@ -456,8 +474,11 @@ export default function ReaderShell({ book, prefs, onExit, onProgress, onOpenSet
       clickIfNotDrag(e, () => {
         if (ratio < 0.25) goPrev();
         else if (ratio > 0.75) goNext();
-        else if (chrome) setChrome(false);
-        else reveal();
+        else if (chrome) {
+          // 用户自己收起的：解除入场钉住，之后按正常 3 秒节奏
+          chromePinned.current = false;
+          setChrome(false);
+        } else reveal();
       });
     },
     [annotations, clickIfNotDrag, goPrev, goNext, chrome, reveal],
@@ -558,6 +579,11 @@ export default function ReaderShell({ book, prefs, onExit, onProgress, onOpenSet
       className="reader-shell"
       data-chrome={chrome ? "on" : "off"}
       data-reader-theme={prefs.readerTheme === "follow" ? undefined : prefs.readerTheme}
+      /* 滚轮也算动手：只用滚轮读的人不该被工具栏一直占着版面 */
+      onWheel={() => {
+        chromePinned.current = false;
+        scheduleHide();
+      }}
       style={{ "--reader-flip-dur": flipFast ? "70ms" : "160ms" } as React.CSSProperties}
     >
       <div
@@ -650,6 +676,11 @@ export default function ReaderShell({ book, prefs, onExit, onProgress, onOpenSet
         >
           <Settings size={20} strokeWidth={2} />
         </button>
+      </div>
+
+      {/* 常驻进度线：底栏收起时唯一能读出「读到哪」的东西，2px 贴下沿不占布局 */}
+      <div className="reader-progress-line" data-hidden={chrome} aria-hidden="true">
+        <span style={{ width: `${Math.max(0, Math.min(100, dragPercent ?? percent))}%` }} />
       </div>
 
       <div

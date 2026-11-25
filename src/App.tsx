@@ -14,6 +14,7 @@ import {
   type ImportProgress,
 } from "./lib/mobileImport";
 import { BOOK_EXTENSIONS } from "./lib/formats";
+import { progressPercent } from "./lib/format";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useAndroidBack } from "./lib/useAndroidBack";
 import { useContextMenuGuard } from "./lib/useContextMenuGuard";
@@ -1129,6 +1130,24 @@ export default function App() {
     return sorted;
   }, [books, filter, query, prefs.sort, tagFilter, tagMap]);
 
+  /*
+   * 「正在读的那一本」：有进度、没读完、最近打开时间最大的那一本。
+   *
+   * 用途只有一个——让进度条保留一处强调色。整屏 4 条实心蓝横线时，
+   * 「我在读哪本」这件事反而要靠读数字；只留一条之后，那一条真的在说话。
+   * 读完的书（100%）与还没开始的（0%）不参与，它们本来就没有「正在读」这回事。
+   */
+  const readingNowId = useMemo(() => {
+    let best: { id: string; at: number } | null = null;
+    for (const b of visible) {
+      const pct = progressPercent(b.progress);
+      if (pct == null || pct <= 0 || pct >= 99) continue;
+      const at = b.last_read_at ?? 0;
+      if (!best || at > best.at) best = { id: b.id, at };
+    }
+    return best?.id ?? null;
+  }, [visible]);
+
   const toggleSelect = useCallback((book: Book) => {
     setSelection((prev) => {
       const next = new Set(prev ?? []);
@@ -1215,6 +1234,7 @@ export default function App() {
               selecting={selection !== null}
               selected={selection?.has(book.id) ?? false}
               onToggleSelect={toggleSelect}
+              emphasis={book.id === readingNowId}
             />
           ))}
         </div>
@@ -1225,6 +1245,7 @@ export default function App() {
           onMenu={handleMenu}
           coverRev={coverRev}
           pending={pendingImports}
+          emphasisId={readingNowId}
         />
       )
     ) : (

@@ -21,6 +21,17 @@ const FIT_OPTIONS: { value: BgFit; label: string }[] = [
 const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "bmp", "gif", "avif"];
 
 /**
+ * 背景页的全部可回退项。
+ *
+ * 背景图与取色色板必须一起走：图没了却留着一套没有来源的色板就是脏数据。
+ * 「清除」按钮与页面级「恢复本页默认」共用这一份。
+ */
+export const BACKGROUND_RESET: Partial<Prefs> = {
+  background: { ...DEFAULT_PREFS.background },
+  monet: { ...DEFAULT_PREFS.monet },
+};
+
+/**
  * 背景子页（v1.9）：书架背景图 + 莫奈取色。
  *
  * 两件事放在同一页是因为它们耦合：换图之后配色就该跟着换，
@@ -94,11 +105,8 @@ export default function BackgroundSettings({ prefs, onPrefs, onToast }: Props) {
   };
 
   const clear = () => {
-    onPrefs({
-      background: { ...DEFAULT_PREFS.background },
-      // 图没了，配色也该跟着走——保留一套没有来源的色板就是脏数据
-      monet: { ...DEFAULT_PREFS.monet },
-    });
+    // 与页面级「恢复本页默认」同一份（背景图 + 取色是一件事的两面）
+    onPrefs(BACKGROUND_RESET);
   };
 
   const toggleMonet = async (next: boolean) => {

@@ -23,6 +23,22 @@ const DOC: BookFormat[] = ["docx", "rtf", "mhtml", "ofd", "xlsx"];
 const COMIC: BookFormat[] = ["cbz", "cbr", "cbt", "cb7", "zip", "folder"];
 
 /**
+ * 每个分类装哪些格式 —— **唯一一份**。
+ *
+ * 侧栏计数、卡片分类、关于页的「支持哪些格式」三处都从这里取。
+ * 关于页原先手写了「小说 / 漫画 / 文档」三段，与侧栏的「文本 / 电子书 / 文档 /
+ * 漫画 / PDF」是两套词，用户从侧栏点「电子书」找不到关于页说的「小说」。
+ * 手写第三份的下场就是这样：各自成立，合起来自相矛盾。
+ */
+export const CATEGORY_FORMATS: Record<CategoryKey, BookFormat[]> = {
+  text: ["txt", "md", "html", "fb2"],
+  ebook: EBOOK,
+  doc: DOC,
+  comic: COMIC,
+  pdf: ["pdf"],
+};
+
+/**
  * 一本书的唯一类别，与侧栏计数同一口径（互斥，加起来等于「全部」）。
  *
  * 顺序有讲究：漫画优先（图片型 MOBI 的 format 还是 mobi），

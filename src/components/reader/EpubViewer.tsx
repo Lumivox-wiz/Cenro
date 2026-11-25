@@ -93,7 +93,13 @@ export default function EpubViewer({
   const [enterDir, setEnterDir] = useState<"next" | "prev">("next");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [chrome, setChrome] = useState(false);
+  /*
+   * 工具栏初始可见（v1.14）。
+   *
+   * 原来是 false：点进一本书，屏幕上没有返回、没有书名、没有读到哪，
+   * 中间点一下能唤出工具栏，但没有任何东西提示可以点。
+   */
+  const [chrome, setChrome] = useState(true);
   const [tocOpen, setTocOpen] = useState(false);
   /** 书签 / 搜索面板 */
   const [extras, setExtras] = useState<ExtrasTab | null>(null);
@@ -561,7 +567,18 @@ export default function EpubViewer({
     setPage(Math.min(pageCount - 1, Math.max(0, columnOf(mark, columns, pageWidth, PAGE_GAP))));
   }, [chapterMarks, html, mode, pageCount, pageWidth]);
 
+  /*
+   * 首次进入「钉住」工具栏：不自动收起，等用户自己动手。
+   *
+   * 工具栏显隐会改正文让位（`data-chrome` → stage 的上下内边距），
+   * 收起时会整页重排。若这个重排发生在用户刚开始读的第 3 秒，等于把他正在看的那一行
+   * 抽走——比一开始就不给工具栏更糟。所以入场不设倒计时，
+   * 用户第一次动作（点正文 / 鼠标进工具栏 / 滚轮）之后才恢复 3 秒自动隐藏。
+   */
+  const chromePinned = useRef(true);
+
   const scheduleHide = useCallback(() => {
+    if (chromePinned.current) return;
     window.clearTimeout(hideTimer.current);
     hideTimer.current = window.setTimeout(() => setChrome(false), 3000);
   }, []);
@@ -582,11 +599,13 @@ export default function EpubViewer({
   );
 
   const reveal = useCallback(() => {
+    chromePinned.current = false;
     setChrome(true);
     scheduleHide();
   }, [scheduleHide]);
 
   const pauseHide = useCallback(() => {
+    chromePinned.current = false;
     window.clearTimeout(hideTimer.current);
   }, []);
 
@@ -777,8 +796,11 @@ export default function EpubViewer({
       clickIfNotDrag(e, () => {
         if (ratio < 0.25) goPrev();
         else if (ratio > 0.75) goNext();
-        else if (chrome) setChrome(false);
-        else reveal();
+        else if (chrome) {
+          // 用户自己收起的：解除入场钉住，之后按正常 3 秒节奏
+          chromePinned.current = false;
+          setChrome(false);
+        } else reveal();
       });
     },
     [annotations, chrome, clickIfNotDrag, footnoteAt, goNext, goPrev, goToAnchor, reveal],
@@ -860,6 +882,14 @@ export default function EpubViewer({
       className="reader-shell"
       data-chrome={chrome ? "on" : "off"}
       data-reader-theme={prefs.readerTheme === "follow" ? undefined : prefs.readerTheme}
+      /*
+       * 滚轮也算「动手了」。只在点击时解除钉住的话，全程用滚轮读的人
+       * 会一直被工具栏占着版面，永远等不到它收起。
+       */
+      onWheel={() => {
+        chromePinned.current = false;
+        scheduleHide();
+      }}
     >
       <div
         className="reader-stage"
@@ -936,6 +966,11 @@ export default function EpubViewer({
         >
           <Settings size={20} strokeWidth={2} />
         </button>
+      </div>
+
+      {/* 常驻进度线：底栏收起后唯一能读出「读到哪」的东西（样式见 reader.css） */}
+      <div className="reader-progress-line" data-hidden={chrome} aria-hidden="true">
+        <span style={{ width: `${Math.max(0, Math.min(100, dragPercent ?? percent))}%` }} />
       </div>
 
       <div

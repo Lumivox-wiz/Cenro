@@ -191,6 +191,42 @@
 }
 
 /*
+ * 常驻进度线（v1.14）。
+ *
+ * 底栏收起后，「读到哪」就没有任何可见线索——正文占满整屏，用户只能靠记忆。
+ * 这里用 2px 贴下沿的一条线兜住：不占布局、不碰正文、不需要先唤出工具栏。
+ *
+ * 层级比浮层再高一档：底栏的背景是半透明的，线压在它下面会透成灰线。
+ * 底栏展开时它多余（那里有可拖动的进度条），所以跟 chrome 反向淡出。
+ */
+.reader-progress-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--safe-bottom, 0px);
+  height: 2px;
+  z-index: calc(var(--z-reader-overlay) + 1);
+  pointer-events: none;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.reader-progress-line > span {
+  display: block;
+  height: 100%;
+  background: var(--c-accent);
+  /*
+   * 0.5 而不是 1：这条线要一直待在那儿，全饱和度的强调色会变成一根
+   * 永远压在页脚的红线，读者会在意它而不是正文。
+   */
+  opacity: 0.5;
+  transition: width var(--dur-base) var(--ease-out);
+}
+
+.reader-progress-line[data-hidden="true"] {
+  opacity: 0;
+}
+
+/*
  * UX §4.2：首次进入漫画时的一次性方向提示，悬在底栏上方，
  * 3 秒后由组件卸载。不挡交互，aria 由 role="status" 播报。
  */

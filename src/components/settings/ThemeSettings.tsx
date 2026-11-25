@@ -1,8 +1,9 @@
 import { Check } from "lucide-react";
+import { DEFAULT_PREFS } from "../../lib/prefs";
 import { READER_THEME_OPTIONS, THEME_OPTIONS, type SectionProps } from "./shared";
 import { OptionRow } from "./Controls";
 import { IS_MOBILE } from "../../lib/platform";
-import type { ReaderTheme, ThemePref } from "../../lib/prefs";
+import type { Prefs, ReaderTheme, ThemePref } from "../../lib/prefs";
 
 /**
  * 每个主题给一块真实的小色板。
@@ -20,6 +21,13 @@ const READER_SWATCH: Record<ReaderTheme, { paper: string; ink: string }> = {
   dark: { paper: "#1a1b1e", ink: "#d4d6da" },
   sepia: { paper: "#f3e6cf", ink: "#5a4a35" },
   oled: { paper: "#000000", ink: "#e8e8e8" },
+};
+
+/** 主题页的全部可回退项。材质与主题正交，但它确实在这一页里，所以必须一起回退。 */
+export const THEME_RESET: Partial<Prefs> = {
+  theme: DEFAULT_PREFS.theme,
+  readerTheme: DEFAULT_PREFS.readerTheme,
+  material: DEFAULT_PREFS.material,
 };
 
 /** 主题子页：应用主题与阅读主题解耦，可混搭（UI §3.2） */

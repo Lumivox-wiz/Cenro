@@ -354,8 +354,9 @@ export function installDevMock(): void {
     list_comic_pages: () => Array.from({ length: 24 }, (_, i) => `page-${i + 1}.jpg`),
     comic_page_path: (a) => comicPage(Number(a.index ?? 0)),
 
-    // 关于页要显示版本号；浏览器里没有 Tauri 的 app 插件
-    "plugin:app|version": () => "0.21.0",
+    // 关于页要显示版本号；浏览器里没有 Tauri 的 app 插件，
+    // 用构建期从 package.json 注入的值，不再手写（手写过一次 "0.21.0"，一路骗到 1.0.1）
+    "plugin:app|version": () => __APP_VERSION__,
 
     list_tags: () => tagList(),
     list_tag_assignments: () => [...bookTags.entries()].flatMap(([id, tags]) => tags.map((t) => [id, t])),

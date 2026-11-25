@@ -2,11 +2,28 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 // @ts-expect-error type error without @types/node package
 import process from "node:process";
+// @ts-expect-error type error without @types/node package
+import { readFileSync } from "node:fs";
 const host = process.env.TAURI_DEV_HOST;
+
+/*
+ * 版本号只有一个来源：package.json（tauri.conf.json 的 version 也从它同步）。
+ *
+ * 开发期没有 Tauri 运行时，devMock 要自己回答 `plugin:app|version`；
+ * 之前那里硬编码了 "0.21.0"，一路跟到 1.0.1 之后所有浏览器截图与 README
+ * 都在印一个不存在的版本。改成构建期注入，改 package.json 就自动同步。
+ */
+const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf-8")) as {
+  version: string;
+};
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
   plugins: [react()],
+
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
 
   /*
    * 构建目标钉死 chrome100。

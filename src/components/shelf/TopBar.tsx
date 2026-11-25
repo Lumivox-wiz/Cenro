@@ -159,6 +159,24 @@ export default function TopBar({
 
   const sortLabel = SORT_ITEMS.find((item) => item.value === sort)?.label ?? "最近打开";
 
+  /*
+   * 窄屏把「分类 / 排序 / 视图」收进同一个菜单。
+   *
+   * 原因：≤767px 时顶栏装不下排序下拉与视图分段控件（两者在 CSS 里 display:none），
+   * 而它们别无入口——安卓上「按标题排序」「切成列表视图」因此根本不可达。
+   * 与其在 393px 宽的顶栏再塞一个按钮把搜索框压到 130px，不如把已有的分类下拉
+   * 扩成三段：按钮宽度一点不变，一次点击就能拿到三个维度。
+   *
+   * ≥768px 不合并：那时排序与分段控件都在顶栏上，重复一遍就是同一件事说三次。
+   */
+  const VIEW_ITEMS: { value: ViewMode; label: string }[] = [
+    { value: "grid", label: "网格视图" },
+    { value: "list", label: "列表视图" },
+  ];
+
+  const mergedRows = FILTER_ITEMS.length + (narrow ? SORT_ITEMS.length + VIEW_ITEMS.length : 0);
+  const mergedHeight = mergedRows * 32 + (narrow ? 2 * 26 + 2 * 13 : 0) + 14;
+
   return (
     <header className="topbar">
       {/* 移动端没有侧栏，这个按钮点了也不会有任何反应，直接隐藏 */}
@@ -179,7 +197,11 @@ export default function TopBar({
         onPointerCancel={brandUp}
         // 长按不该顺手选中文字，也不该弹出原生菜单
         onContextMenu={(e) => e.preventDefault()}
-        title="长按 0.8 秒打开隐私书架"
+        /*
+         * 不给 title。隐私书架是刻意做成隐藏手势的，用系统 tooltip 把它写出来
+         * 既破坏了「隐藏」本身，也和全站自绘 tooltip（data-tip）不是一套语汇。
+         * 明路一直有：设置 → 隐私 → 打开隐私书架。
+         */
       >
         岑序
       </span>
@@ -214,7 +236,9 @@ export default function TopBar({
         onClick={openFilterMenu}
         aria-haspopup="menu"
         aria-expanded={filterMenu !== null}
-        aria-label={`分类：${scopeLabel}`}
+        aria-label={
+          narrow ? `分类、排序与视图：当前 ${scopeLabel}` : `分类：${scopeLabel}`
+        }
       >
         <span className="topbar-menu-btn-label">{scopeLabel}</span>
         <ChevronDown size={14} strokeWidth={2} aria-hidden="true" />
@@ -302,27 +326,82 @@ export default function TopBar({
           x={filterMenu.x}
           y={filterMenu.y}
           width={168}
-          height={FILTER_ITEMS.length * 32 + 14}
-          label="选择分类"
+          height={mergedHeight}
+          label={narrow ? "分类、排序与视图" : "选择分类"}
           onClose={() => setFilterMenu(null)}
         >
-          {FILTER_ITEMS.map((item) => (
-            <button
-              key={item.value}
-              role="menuitemradio"
-              aria-checked={filter === item.value}
-              className="filter-item"
-              onClick={() => {
-                onFilter(item.value);
-                setFilterMenu(null);
-              }}
-            >
-              <span className="filter-item-label">{item.label}</span>
-              {filter === item.value && (
-                <Check size={14} strokeWidth={2.4} className="filter-item-check" />
-              )}
-            </button>
-          ))}
+          <div role="group" aria-label="分类">
+            {FILTER_ITEMS.map((item) => (
+              <button
+                key={item.value}
+                role="menuitemradio"
+                aria-checked={filter === item.value}
+                className="filter-item"
+                onClick={() => {
+                  onFilter(item.value);
+                  setFilterMenu(null);
+                }}
+              >
+                <span className="filter-item-label">{item.label}</span>
+                {filter === item.value && (
+                  <Check size={14} strokeWidth={2.4} className="filter-item-check" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* 窄屏专供：顶栏上那两个控件被 CSS 关掉了，这里是它们唯一的入口 */}
+          {narrow && (
+            <>
+              <div className="menu-sep" role="separator" />
+              <div role="group" aria-label="排序">
+                <div className="menu-group-label" aria-hidden="true">
+                  排序
+                </div>
+                {SORT_ITEMS.map((item) => (
+                  <button
+                    key={item.value}
+                    role="menuitemradio"
+                    aria-checked={sort === item.value}
+                    className="filter-item"
+                    onClick={() => {
+                      onSort(item.value);
+                      setFilterMenu(null);
+                    }}
+                  >
+                    <span className="filter-item-label">{item.label}</span>
+                    {sort === item.value && (
+                      <Check size={14} strokeWidth={2.4} className="filter-item-check" />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              <div className="menu-sep" role="separator" />
+              <div role="group" aria-label="视图">
+                <div className="menu-group-label" aria-hidden="true">
+                  视图
+                </div>
+                {VIEW_ITEMS.map((item) => (
+                  <button
+                    key={item.value}
+                    role="menuitemradio"
+                    aria-checked={view === item.value}
+                    className="filter-item"
+                    onClick={() => {
+                      onView(item.value);
+                      setFilterMenu(null);
+                    }}
+                  >
+                    <span className="filter-item-label">{item.label}</span>
+                    {view === item.value && (
+                      <Check size={14} strokeWidth={2.4} className="filter-item-check" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </MenuShell>
       )}
 

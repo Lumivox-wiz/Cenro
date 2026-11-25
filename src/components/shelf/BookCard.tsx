@@ -18,6 +18,11 @@ interface Props {
    * 浏览器不会重新请求，所以靠 key 变化强制重建 img 节点。
    */
   coverRev?: number;
+  /**
+   * 是不是「正在读的那一本」。只作用于进度条：整屏只留一处强调色，
+   * 其余未读完的用中性灰（见 components.css 的 .card-progress-track）。
+   */
+  emphasis?: boolean;
   /** 选择模式：点卡面变成「勾选」而不是「打开」 */
   selecting?: boolean;
   selected?: boolean;
@@ -36,6 +41,7 @@ export default function BookCard({
   onOpen,
   onMenu,
   coverRev = 0,
+  emphasis = false,
   selecting = false,
   selected = false,
   onToggleSelect,
@@ -161,6 +167,7 @@ export default function BookCard({
               className="card-progress-track"
               aria-hidden="true"
               data-done={pct >= 99 ? "" : undefined}
+              data-emphasis={emphasis ? "" : undefined}
             >
               <span style={{ width: `${pct}%` }} />
             </span>

@@ -108,7 +108,11 @@ export default function HtmlViewer({
   const [enterDir, setEnterDir] = useState<"next" | "prev">("next");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [chrome, setChrome] = useState(false);
+  /*
+   * 工具栏初始可见（v1.14）：点进一本书时屏幕上得有返回、书名与进度，
+   * 否则用户只能靠「点一下试试」发现控件。
+   */
+  const [chrome, setChrome] = useState(true);
   const [tocOpen, setTocOpen] = useState(false);
   /** 书签 / 搜索面板；null 表示关闭 */
   const [extras, setExtras] = useState<ExtrasTab | null>(null);
@@ -622,7 +626,14 @@ export default function HtmlViewer({
     return () => window.clearTimeout(saveTimer.current);
   }, [meta, chapters, chapterIndex, chapterRatio, onProgress]);
 
+  /*
+   * 入场钉住：工具栏显隐会改正文让位，收起时整页重排。
+   * 这个重排若发生在用户刚开始读的第 3 秒，等于把他正在看的那一行抽走。
+   */
+  const chromePinned = useRef(true);
+
   const scheduleHide = useCallback(() => {
+    if (chromePinned.current) return;
     window.clearTimeout(hideTimer.current);
     hideTimer.current = window.setTimeout(() => setChrome(false), 3000);
   }, []);
@@ -643,11 +654,13 @@ export default function HtmlViewer({
   );
 
   const reveal = useCallback(() => {
+    chromePinned.current = false;
     setChrome(true);
     scheduleHide();
   }, [scheduleHide]);
 
   const pauseHide = useCallback(() => {
+    chromePinned.current = false;
     window.clearTimeout(hideTimer.current);
   }, []);
 
@@ -877,8 +890,11 @@ export default function HtmlViewer({
       clickIfNotDrag(e, () => {
         if (ratio < 0.25) goPrev();
         else if (ratio > 0.75) goNext();
-        else if (chrome) setChrome(false);
-        else reveal();
+        else if (chrome) {
+          // 用户自己收起的：解除入场钉住，之后按正常 3 秒节奏
+          chromePinned.current = false;
+          setChrome(false);
+        } else reveal();
       });
     },
     [annotations, chrome, clickIfNotDrag, footnoteAt, goNext, goPrev, goToAnchor, reveal],
@@ -966,6 +982,11 @@ export default function HtmlViewer({
       className="reader-shell"
       data-chrome={chrome ? "on" : "off"}
       data-reader-theme={prefs.readerTheme === "follow" ? undefined : prefs.readerTheme}
+      /* 滚轮也算动手：只用滚轮读的人不该被工具栏一直占着版面 */
+      onWheel={() => {
+        chromePinned.current = false;
+        scheduleHide();
+      }}
     >
       <div
         className="reader-stage"
@@ -1045,6 +1066,11 @@ export default function HtmlViewer({
         >
           <Settings size={20} strokeWidth={2} />
         </button>
+      </div>
+
+      {/* 常驻进度线：底栏收起后唯一能读出「读到哪」的东西（样式见 reader.css） */}
+      <div className="reader-progress-line" data-hidden={chrome} aria-hidden="true">
+        <span style={{ width: `${Math.max(0, Math.min(100, dragPercent ?? percent))}%` }} />
       </div>
 
       <div

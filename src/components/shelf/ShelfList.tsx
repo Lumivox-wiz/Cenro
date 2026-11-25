@@ -14,17 +14,27 @@ interface Props {
   coverRev?: number;
   /** 导入中的占位行，排在最前 */
   pending?: PendingImport[];
+  /** 「正在读的那一本」的 id：只有它的进度条走强调色，与网格视图同一口径 */
+  emphasisId?: string | null;
 }
 
-/** 4.2 列表视图：行高 64px，列＝封面 / 标题 / 类型 / 进度 / 最近阅读。 */
-export default function ShelfList({ books, onOpen, onMenu, coverRev = 0, pending }: Props) {
+/** 4.2 列表视图：行高 64px，列＝封面 / 标题 / 格式 / 进度 / 最近阅读。 */
+export default function ShelfList({
+  books,
+  onOpen,
+  onMenu,
+  coverRev = 0,
+  pending,
+  emphasisId = null,
+}: Props) {
   const longPress = useLongPress((b, x, y) => onMenu?.(b, x, y));
   return (
     <div className="shelf-list" role="list">
       <div className="list-head" aria-hidden="true">
         <span />
         <span>标题</span>
-        <span>类型</span>
+        {/* 列里装的是 EPUB / TXT 这类**格式**，不是「类型」（文本 / 电子书 / 漫画） */}
+        <span>格式</span>
         <span>进度</span>
         <span>最近阅读</span>
       </div>
@@ -106,7 +116,10 @@ export default function ShelfList({ books, onOpen, onMenu, coverRev = 0, pending
             <span className="row-progress">
               {pct != null && pct > 0 ? (
                 <>
-                  <span className="row-progress-track">
+                  <span
+                    className="row-progress-track"
+                    data-emphasis={book.id === emphasisId ? "" : undefined}
+                  >
                     <span style={{ width: `${pct}%` }} />
                   </span>
                   <span className="row-cell" style={{ minWidth: 40, textAlign: "right" }}>
