@@ -26,7 +26,7 @@ import { useFocusTrap } from "../../lib/useFocusTrap";
 import PdfPage, { type PageHighlight } from "./PdfPage";
 import SelectionActions from "./SelectionActions";
 import { logError } from "../../lib/log";
-import { buildIndex, ocrApi, type OcrStatus } from "../../lib/ocr";
+import { buildIndex, looksScanned, ocrApi, type OcrStatus } from "../../lib/ocr";
 import type { SelectionTarget } from "../../lib/highlight";
 import ShortcutHelp, { type HelpSection } from "./ShortcutHelp";
 
@@ -423,6 +423,41 @@ export default function PdfViewer({
       alive = false;
     };
   }, [book.id, doc]);
+
+  /*
+   * 打开时抽前 3 页问一下：是扫描件吗？
+   *
+   * 只在「扫描件 + 还没建索引」时给一条提示。不做成弹窗、不自动开始——
+   * 大多数 PDF 有文字层，提示根本不该出现；真需要的人看到一次就知道有这功能。
+   * 采样 3 页而不是全本：这一步跟着打开一起做，不能慢。
+   */
+  const [ocrHintOpen, setOcrHintOpen] = useState(true);
+  const [scanProbe, setScanProbe] = useState<"unknown" | "scanned" | "text">("unknown");
+  useEffect(() => {
+    if (!doc) return;
+    let alive = true;
+    setScanProbe("unknown");
+    void (async () => {
+      try {
+        const sample = Math.min(3, doc.numPages);
+        let chars = 0;
+        for (let n = 1; n <= sample; n += 1) {
+          const page = await doc.getPage(n);
+          const content = await page.getTextContent();
+          chars += extractFlatText(
+            content.items as unknown as Array<{ str?: string; hasEOL?: boolean }>,
+          ).flat.trim().length;
+          page.cleanup();
+        }
+        if (alive) setScanProbe(looksScanned(chars, sample) ? "scanned" : "text");
+      } catch {
+        if (alive) setScanProbe("text"); // 探测失败就当普通 PDF，不打扰
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [doc]);
 
   /** 逐页渲染 + 识别。取消只影响「后面还没做的页」，已完成的留在库里 */
   const buildOcrIndex = useCallback(async () => {
@@ -942,6 +977,51 @@ export default function PdfViewer({
           </div>
         )}
       </div>
+
+      {/*
+       * 扫描件提示条。位置与 .reader-dir-hint 一致（悬在底栏上方），
+       * 但它是常驻的：等用户动手，不自动消失——自动消失的东西看不见就等于没有。
+       */}
+      {ocrHintOpen &&
+        !error &&
+        doc &&
+        scanProbe === "scanned" &&
+        (ocrBusy || ocrPages === 0) && (
+          <div className="reader-ocr-hint" role="status">
+            <span className="reader-ocr-hint-text">
+              {ocrBusy
+                ? `正在识别 ${ocrProgress.done} / ${ocrProgress.total} 页`
+                : `这本是扫描件，建立索引后可搜索（约 ${Math.max(
+                    5,
+                    Math.round((doc.numPages * 0.45) / 5) * 5,
+                  )} 秒）`}
+            </span>
+            {ocrBusy ? (
+              <button
+                className="reader-ocr-hint-btn"
+                onClick={() => {
+                  ocrCancel.current = true;
+                }}
+              >
+                停止
+              </button>
+            ) : (
+              <button className="reader-ocr-hint-btn" onClick={() => void buildOcrIndex()}>
+                建立索引
+              </button>
+            )}
+            {!ocrBusy && (
+              <button
+                className="reader-ocr-hint-close"
+                onClick={() => setOcrHintOpen(false)}
+                aria-label="不再提示"
+                title="不再提示"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        )}
 
       <div className="reader-bottombar" data-hidden={false}>
         <div className="reader-progress">
