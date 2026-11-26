@@ -5,12 +5,14 @@ import {
   Columns2,
   FlipHorizontal2,
   HelpCircle,
+  Languages,
   Rows3,
   ScanText,
   Square,
   X,
 } from "lucide-react";
 import { imageUrlToJpeg, ocrApi, type OcrBlocks } from "../../lib/ocr";
+import { translateBatch } from "../../lib/translate";
 import { comicApi, errorText, fileUrl } from "../../api";
 import type { Book, Progress, SpreadMode } from "../../types";
 import type { SpreadModePref } from "../../lib/prefs";
@@ -109,6 +111,9 @@ export default function ComicViewer({
   >(null);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [ocrNote, setOcrNote] = useState<string | null>(null);
+  /** 与 ocrResult.blocks 等长的译文；null 表示显示原文 */
+  const [translated, setTranslated] = useState<string[] | null>(null);
+  const [trBusy, setTrBusy] = useState(false);
   const spreadRef = useRef<HTMLDivElement>(null);
   const ocrVertical = rtl; // 右→左按日漫处理，默认认为有竖排
   const [helpOpen, setHelpOpen] = useState(false);
@@ -242,6 +247,15 @@ export default function ComicViewer({
     }
     hideTimer.current = window.setTimeout(() => setChrome(false), 3000);
   }, [helpOpen]);
+
+  /*
+   * 翻页即清空识别与译文：框是按上一页的坐标算的，留着会盖在别的页上。
+   * （踩过：翻页后点「译」只把上一页的译文关掉，用户以为翻译坏了。）
+   */
+  useEffect(() => {
+    setOcrResult(null);
+    setTranslated(null);
+  }, [page]);
 
   // 窗口宽度决定 auto 模式是否进入双页
   useEffect(() => {
@@ -423,6 +437,7 @@ export default function ComicViewer({
         top: rect && box ? rect.top - box.top : 0,
         scale,
       });
+      setTranslated(null);
     } catch (e) {
       setOcrNote(`识别失败：${e instanceof Error ? e.message : String(e)}`);
       window.setTimeout(() => setOcrNote(null), 4000);
@@ -430,6 +445,55 @@ export default function ComicViewer({
       setOcrBusy(false);
     }
   }, [book.id, ocrBusy, ocrResult, ocrVertical, spreadUrls]);
+
+  /**
+   * 识别 + 翻译本页。
+   *
+   * 顺序上先翻译服务、后 OCR：真想接系统 Translator 时，`create()` 必须在
+   * 用户手势的同一拍里发起，中间插一次几百毫秒的 OCR 就会丢掉手势。
+   * 现在走的是后端 HTTP，没有这个约束，但顺序保持一致，换 provider 时不用改。
+   */
+  const runTranslate = useCallback(async () => {
+    if (trBusy) return;
+    // 已经译过就切回原文
+    if (translated) {
+      setTranslated(null);
+      return;
+    }
+    setTrBusy(true);
+    try {
+      let blocks = ocrResult?.blocks ?? [];
+      if (blocks.length === 0) {
+        const url = spreadUrls.find(Boolean);
+        if (!url) return;
+        const jpeg = await imageUrlToJpeg(url);
+        const res = await ocrApi.blocks(book.id, jpeg, ocrVertical);
+        const img = spreadRef.current?.querySelector<HTMLImageElement>(".comic-page");
+        const box = spreadRef.current?.getBoundingClientRect();
+        const rect = img?.getBoundingClientRect();
+        setOcrResult({
+          ...res,
+          left: rect && box ? rect.left - box.left : 0,
+          top: rect && box ? rect.top - box.top : 0,
+          scale: rect && res.width > 0 ? rect.width / res.width : 1,
+        });
+        blocks = res.blocks;
+      }
+      if (blocks.length === 0) {
+        setOcrNote("这一页没有识别到文字");
+        window.setTimeout(() => setOcrNote(null), 3000);
+        return;
+      }
+
+      const out = await translateBatch(blocks.map((b) => b.text));
+      setTranslated(out.texts);
+    } catch (e) {
+      setOcrNote(`翻译失败：${e instanceof Error ? e.message : String(e)}`);
+      window.setTimeout(() => setOcrNote(null), 5000);
+    } finally {
+      setTrBusy(false);
+    }
+  }, [book.id, ocrResult, ocrVertical, spreadUrls, trBusy, translated]);
 
   return (
     <div className="reader-shell" data-reader-theme="light">
@@ -505,8 +569,14 @@ export default function ComicViewer({
                     <span
                       key={i}
                       className="comic-ocr-box"
-                      // 竖排的来源要竖着排回去：宽高比说明了一切
-                      data-vertical={b.height > b.width * 1.2 ? "true" : undefined}
+                      /*
+                       * 竖排只管原文：译文是横排的中文，塞进 25px 宽的窄框里竖排会挤成一列点。
+                       * 宽高比说明原文字列是竖的，译文则一律横排。
+                       */
+                      data-vertical={
+                        !translated?.[i]?.trim() && b.height > b.width * 1.2 ? "true" : undefined
+                      }
+                      data-translated={translated?.[i]?.trim() ? "true" : undefined}
                       style={{
                         left: ocrResult.left + b.x * ocrResult.scale,
                         top: ocrResult.top + b.y * ocrResult.scale,
@@ -514,7 +584,7 @@ export default function ComicViewer({
                         height: b.height * ocrResult.scale,
                       }}
                     >
-                      {b.text}
+                      {translated?.[i]?.trim() ? translated[i] : b.text}
                     </span>
                   ))}
                 </div>
@@ -574,6 +644,16 @@ export default function ComicViewer({
           title="识别本页文字（实验）"
         >
           <ScanText size={20} strokeWidth={2} />
+        </button>
+        <button
+          className="reader-toolbar-btn"
+          onClick={() => void runTranslate()}
+          aria-pressed={!!translated}
+          aria-label="翻译本页文字"
+          title="识别并翻译本页（实验）"
+          disabled={trBusy}
+        >
+          <Languages size={20} strokeWidth={2} />
         </button>
         <button
           className="reader-toolbar-btn"

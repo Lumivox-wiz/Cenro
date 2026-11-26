@@ -92,6 +92,17 @@
   overflow: hidden;
 }
 
+/*
+ * 译文：横排、字号压小。竖排气泡的框只有二三十像素宽，
+ * 中文译文在里面要么竖着排（一列一点点字），要么横排换行——后者才读得下去。
+ */
+.comic-ocr-box[data-translated="true"] {
+  writing-mode: horizontal-tb;
+  font-size: 11px;
+  line-height: 1.15;
+  letter-spacing: -0.2px;
+}
+
 /* 竖排原文（日漫）：竖着排回去，否则中文/日文会在窄框里横着挤成一团 */
 .comic-ocr-box[data-vertical="true"] {
   writing-mode: vertical-rl;
