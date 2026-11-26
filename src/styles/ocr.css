@@ -78,3 +78,49 @@
 .reader-ocr-hint-close:hover {
   color: var(--c-text-secondary);
 }
+
+/*
+ * 漫画识文叠层：把识别到的块按原位盖回图上。
+ *
+ * 现在是「看得见」的原型——白底半透明 + 细边，只为核对检测与坐标；
+ * 接上翻译后，这里会换成译文（同样尺寸、同样位置）。
+ */
+.comic-ocr-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* 竖排原文（日漫）：竖着排回去，否则中文/日文会在窄框里横着挤成一团 */
+.comic-ocr-box[data-vertical="true"] {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+}
+
+.comic-ocr-box {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 4px;
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--c-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--c-bg-elevated) 82%, transparent);
+  color: var(--c-text-primary);
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+  overflow: hidden;
+}
+
+/*
+ * 叠层的定位基准。
+ *
+ * `.comic-spread` 原本没有 position，绝对定位的 `.comic-ocr-layer` 会一路找到
+ * reader-shell 上去——实测 layer 落在 (0,0)、框整体偏出图片。给它一个 relative，
+ * 框的坐标就与图片同一个原点。relative 不带偏移量，不影响原有布局。
+ */
+.comic-spread {
+  position: relative;
+}

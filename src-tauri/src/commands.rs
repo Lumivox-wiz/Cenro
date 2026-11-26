@@ -2246,6 +2246,41 @@ pub fn ocr_search(state: State<'_, AppState>, id: String, query: String) -> Resu
     Ok(hits)
 }
 
+#[derive(serde::Serialize)]
+pub struct OcrBlocks {
+    width: u32,
+    height: u32,
+    blocks: Vec<crate::ocr::Block>,
+}
+
+/// 识别一张图并返回**带坐标**的文字块（不落库）。
+///
+/// 给漫画用：气泡要按原位覆盖译文，光有字符串没用。
+/// `vertical` 打开时多跑一遍旋转推理，日漫竖排才认得出。
+#[tauri::command]
+pub fn ocr_blocks(
+    state: State<'_, AppState>,
+    id: String,
+    jpeg: String,
+    vertical: bool,
+) -> Result<OcrBlocks> {
+    use base64::Engine as _;
+    visible_book(&state, &id)?;
+
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(jpeg.as_bytes())
+        .map_err(|e| AppError::Other(format!("图片解码失败：{e}")))?;
+    let img = image::load_from_memory(&bytes)?;
+    let (width, height) = (img.width(), img.height());
+    let blocks = state.ocr.recognize_blocks(&img, vertical)?;
+    // 原图尺寸一起回去：前端要按显示尺寸换算百分比，不然框会飘
+    Ok(OcrBlocks {
+        width,
+        height,
+        blocks,
+    })
+}
+
 #[tauri::command]
 pub fn ocr_clear(state: State<'_, AppState>, id: String) -> Result<()> {
     visible_book(&state, &id)?;

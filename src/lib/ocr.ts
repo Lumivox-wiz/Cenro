@@ -25,6 +25,17 @@ export type OcrHit = { page: number; snippet: string };
 
 export type OcrInfo = { ready: boolean; bytes: number; engine: string };
 
+export type OcrBlock = {
+  text: string;
+  confidence: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type OcrBlocks = { width: number; height: number; blocks: OcrBlock[] };
+
 export const ocrApi = {
   info: () => invoke<OcrInfo>("ocr_info"),
   status: (id: string) => invoke<OcrStatus>("ocr_status", { id }),
@@ -34,6 +45,9 @@ export const ocrApi = {
   finish: (id: string, status: string) => invoke<OcrStatus>("ocr_finish", { id, status }),
   search: (id: string, query: string) => invoke<OcrHit[]>("ocr_search", { id, query }),
   clear: (id: string) => invoke<void>("ocr_clear", { id }),
+  /** 带坐标的识别（漫画用）：不落库，纯一次性的结果 */
+  blocks: (id: string, jpeg: string, vertical: boolean) =>
+    invoke<OcrBlocks>("ocr_blocks", { id, jpeg, vertical }),
 };
 
 /**
@@ -67,6 +81,32 @@ export async function renderPageJpeg(
   }
 
   const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+  canvas.width = 0;
+  canvas.height = 0;
+  return dataUrl.slice(dataUrl.indexOf(",") + 1);
+}
+
+/**
+ * 把一张已经显示出来的图片（漫画页）转成 JPEG base64。
+ *
+ * 直接 `fetch(src).blob()` 再解码：drawImage 到 canvas 在跨源时会污染画布，
+ * `toDataURL` 直接抛异常。asset 协议同源，才能这样走。
+ */
+export async function imageUrlToJpeg(url: string, maxEdge = 1600): Promise<string> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`读取图片失败：${res.status}`);
+  const bitmap = await createImageBitmap(await res.blob());
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) throw new Error("拿不到 2D 上下文");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
   canvas.width = 0;
   canvas.height = 0;
   return dataUrl.slice(dataUrl.indexOf(",") + 1);

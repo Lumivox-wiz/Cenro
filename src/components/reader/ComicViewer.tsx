@@ -6,9 +6,11 @@ import {
   FlipHorizontal2,
   HelpCircle,
   Rows3,
+  ScanText,
   Square,
   X,
 } from "lucide-react";
+import { imageUrlToJpeg, ocrApi, type OcrBlocks } from "../../lib/ocr";
 import { comicApi, errorText, fileUrl } from "../../api";
 import type { Book, Progress, SpreadMode } from "../../types";
 import type { SpreadModePref } from "../../lib/prefs";
@@ -95,6 +97,20 @@ export default function ComicViewer({
   const [error, setError] = useState<string | null>(null);
   const [spreadUrls, setSpreadUrls] = useState<(string | null)[]>([]);
   const [chrome, setChrome] = useState(true);
+  /*
+   * 漫画「识文」：把当前页的气泡文字识别出来，按原位叠在图上。
+   *
+   * 这一版只给「看得见」——译文还没接，先证明检测与坐标可用。
+   * 竖排（日漫）要靠 `vertical` 打开旋转推理，横排国漫开着也只是慢一点。
+   */
+  const [ocrResult, setOcrResult] = useState<
+    | (OcrBlocks & { left: number; top: number; scale: number })
+    | null
+  >(null);
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrNote, setOcrNote] = useState<string | null>(null);
+  const spreadRef = useRef<HTMLDivElement>(null);
+  const ocrVertical = rtl; // 右→左按日漫处理，默认认为有竖排
   const [helpOpen, setHelpOpen] = useState(false);
   /**
    * UX §4.2：首次进入漫画阅读时的一次性方向提示，3 秒消失（与 Toast 时长一致）。
@@ -383,6 +399,38 @@ export default function ComicViewer({
     pages.length > 0,
   );
 
+  /** 识别当前页：取图上可见的 URL → 转 JPEG → 交给 Rust → 记下显示尺寸用于叠框 */
+  const runOcr = useCallback(async () => {
+    if (ocrBusy) return;
+    if (ocrResult) {
+      setOcrResult(null);
+      return;
+    }
+    const url = spreadUrls.find(Boolean);
+    if (!url) return;
+    setOcrBusy(true);
+    try {
+      const jpeg = await imageUrlToJpeg(url);
+      const res = await ocrApi.blocks(book.id, jpeg, ocrVertical);
+      // 图片在容器里是 contain 布局：按实际渲染尺寸换算，否则框会整体偏移
+      const img = spreadRef.current?.querySelector<HTMLImageElement>(".comic-page");
+      const box = spreadRef.current?.getBoundingClientRect();
+      const rect = img?.getBoundingClientRect();
+      const scale = rect && res.width > 0 ? rect.width / res.width : 1;
+      setOcrResult({
+        ...res,
+        left: rect && box ? rect.left - box.left : 0,
+        top: rect && box ? rect.top - box.top : 0,
+        scale,
+      });
+    } catch (e) {
+      setOcrNote(`识别失败：${e instanceof Error ? e.message : String(e)}`);
+      window.setTimeout(() => setOcrNote(null), 4000);
+    } finally {
+      setOcrBusy(false);
+    }
+  }, [book.id, ocrBusy, ocrResult, ocrVertical, spreadUrls]);
+
   return (
     <div className="reader-shell" data-reader-theme="light">
       <div
@@ -409,6 +457,7 @@ export default function ComicViewer({
         ) : !webtoon ? (
           <>
             <div
+              ref={spreadRef}
               className="comic-spread"
               data-mode={spread}
               data-rtl={rtl}
@@ -449,6 +498,26 @@ export default function ComicViewer({
                     <div key={i} className="comic-page-missing" />
                   ),
                 )
+              )}
+              {ocrResult && (
+                <div className="comic-ocr-layer" aria-hidden="true">
+                  {ocrResult.blocks.map((b, i) => (
+                    <span
+                      key={i}
+                      className="comic-ocr-box"
+                      // 竖排的来源要竖着排回去：宽高比说明了一切
+                      data-vertical={b.height > b.width * 1.2 ? "true" : undefined}
+                      style={{
+                        left: ocrResult.left + b.x * ocrResult.scale,
+                        top: ocrResult.top + b.y * ocrResult.scale,
+                        width: b.width * ocrResult.scale,
+                        height: b.height * ocrResult.scale,
+                      }}
+                    >
+                      {b.text}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
             <div
@@ -499,6 +568,15 @@ export default function ComicViewer({
         </button>
         <button
           className="reader-toolbar-btn"
+          onClick={() => void runOcr()}
+          aria-pressed={!!ocrResult}
+          aria-label="识别本页文字"
+          title="识别本页文字（实验）"
+        >
+          <ScanText size={20} strokeWidth={2} />
+        </button>
+        <button
+          className="reader-toolbar-btn"
           onClick={() => setExtras("annotation")}
           aria-label="标注"
           title="书签与标注"
@@ -517,6 +595,12 @@ export default function ComicViewer({
           <X size={20} strokeWidth={2} />
         </button>
       </div>
+
+      {ocrNote && (
+        <p className="reader-toast" role="status">
+          {ocrNote}
+        </p>
+      )}
 
       <div className="reader-bottombar" data-hidden={!chrome}>
         <div className="reader-progress">

@@ -407,6 +407,7 @@ pub fn run() {
             commands::ocr_finish,
             commands::ocr_search,
             commands::ocr_clear,
+            commands::ocr_blocks,
             commands::export_annotations,
             commands::import_annotations,
             commands::log_frontend,

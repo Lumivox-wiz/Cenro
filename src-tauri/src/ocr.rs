@@ -49,6 +49,58 @@ impl Ocr {
         (DET.len() + REC.len() + DICT.len()) as u64
     }
 
+    /// 识别一张图，返回带坐标的文字块，按上→下、左→右排好。
+    ///
+    /// `vertical` 时多跑一遍「整页逆时针转 90°」：
+    /// 检测网络能框出竖排的字列，但识别网络按横排训练，直接喂进去是乱码
+    /// （实测把「この声は…」读成「…开0」）。转 90° 后字变横排，识别正常，
+    /// 再把框映射回来。代价是每页多一次推理，所以只在漫画那边显式开启。
+    pub fn recognize_blocks(
+        &self,
+        image: &image::DynamicImage,
+        vertical: bool,
+    ) -> Result<Vec<Block>> {
+        let mut guard = self
+            .engine
+            .lock()
+            .map_err(|_| AppError::Other("OCR 引擎状态异常".into()))?;
+        if guard.is_none() {
+            *guard = Some(
+                OcrEngine::new(DET, REC, DICT).map_err(|e| format!("初始化失败：{e}")),
+            );
+        }
+        let engine = match guard.as_ref().unwrap() {
+            Ok(e) => e,
+            Err(msg) => return Err(AppError::Other(format!("OCR 引擎不可用：{msg}"))),
+        };
+
+        let mut blocks = collect(engine, image, 0.0, 0.0, false)?;
+
+        if vertical {
+            // 逆时针 90°：(x,y) → (x'=y, y'=W-1-x)；反解 x = W-1-y', y = x'
+            let rotated =
+                image::DynamicImage::ImageRgb8(image::imageops::rotate270(&image.to_rgb8()));
+            let (w, _h) = (image.width() as f32, image.height() as f32);
+            let mut mapped = collect(engine, &rotated, 0.0, 0.0, true)?;
+            for b in &mut mapped {
+                let (rx, ry, rw, rh) = (b.x, b.y, b.width, b.height);
+                b.x = w - (ry + rh);
+                b.y = rx;
+                b.width = rh;
+                b.height = rw;
+            }
+            // 只收原图里「竖着」的块
+            mapped.retain(|b| b.height > b.width * 1.2);
+            // 横排那一遍会把竖排的字列读成乱码（实测「この声は…」→「i>直、2H」），
+            // 位置与旋转后的块重叠，按面积覆盖丢掉
+            blocks.retain(|h| !mapped.iter().any(|v| overlap_ratio(h, v) > 0.5));
+            blocks.extend(mapped);
+        }
+
+        blocks.sort_by(|a, b| a.y.total_cmp(&b.y).then(a.x.total_cmp(&b.x)));
+        Ok(blocks)
+    }
+
     /// 识别一张图，返回按视觉顺序拼接的文本（行间用 `\n`）。
     ///
     /// 为什么是 `\n` 而不是空格：搜索时用户输入的是词，不是句子，
@@ -92,6 +144,23 @@ impl Ocr {
     }
 
 }
+
+/// 一块识别结果：文本 + 置信度 + 在原图上的矩形。
+///
+/// 漫画要用坐标（气泡位置、后续译文要盖回原位），所以这一路不能只回字符串。
+#[derive(serde::Serialize, Clone, Debug)]
+pub struct Block {
+    pub text: String,
+    pub confidence: f32,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+/// 低于这个置信度的块直接丢掉：横排中文正文极少低于 0.6，
+/// 而漫画背景里的网点、装饰图形常被检出 0.2~0.4 的「文字」。
+const MIN_CONFIDENCE: f32 = 0.5;
 
 /// 页文本落库。重复识别同一页时覆盖——换模型重跑就靠这条。
 pub fn save_page(
@@ -178,6 +247,47 @@ pub fn now_secs() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0)
+}
+
+/// 两个框的重叠比例：交集 / 较小者的面积。用来判断「同一处文字被读了两遍」。
+fn overlap_ratio(a: &Block, b: &Block) -> f32 {
+    let x0 = a.x.max(b.x);
+    let y0 = a.y.max(b.y);
+    let x1 = (a.x + a.width).min(b.x + b.width);
+    let y1 = (a.y + a.height).min(b.y + b.height);
+    if x1 <= x0 || y1 <= y0 {
+        return 0.0;
+    }
+    let inter = (x1 - x0) * (y1 - y0);
+    let smaller = (a.width * a.height).min(b.width * b.height).max(1.0);
+    inter / smaller
+}
+
+/// 跑一遍引擎，把结果转成 `Block` 并过滤低置信度。
+///
+/// `dx`/`dy` 留给「分块识别再拼回去」用；整页识别时传 0。
+fn collect(
+    engine: &OcrEngine,
+    image: &image::DynamicImage,
+    dx: f32,
+    dy: f32,
+    _rotated: bool,
+) -> Result<Vec<Block>> {
+    let raw = engine
+        .recognize_all(image, OrderBy::Horizontal)
+        .map_err(|e| AppError::Other(format!("识别失败：{e}")))?;
+    Ok(raw
+        .into_iter()
+        .filter(|b| b.confidence >= MIN_CONFIDENCE && !b.text.trim().is_empty())
+        .map(|b| Block {
+            text: b.text.trim().to_string(),
+            confidence: b.confidence,
+            x: b.x + dx,
+            y: b.y + dy,
+            width: b.width,
+            height: b.height,
+        })
+        .collect())
 }
 
 #[cfg(test)]
