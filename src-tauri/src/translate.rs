@@ -111,14 +111,41 @@ fn post(cfg: &TranslateConfig, prompt: &str) -> Result<String> {
         req = req.bearer_auth(cfg.api_key.trim());
     }
 
-    let resp = req
-        .send()
-        .map_err(|e| AppError::Other(format!("连不上翻译服务（{}）：{e}", cfg.endpoint)))?;
+    /*
+     * 报错要能指导下一步。
+     *
+     * 用户里有相当一部分不知道「端点」是什么，`error sending request` 对他们等于没说。
+     * 这里按「最可能的原因 + 该去改什么」来分类，宁可啰嗦一句也不要让人卡在黑盒里。
+     */
+    let resp = req.send().map_err(|e| {
+        if e.is_timeout() {
+            AppError::Other(format!(
+                "翻译服务 90 秒没有响应（{}）。模型可能在加载大文件，或者服务卡住了。",
+                cfg.endpoint
+            ))
+        } else if e.is_connect() {
+            AppError::Other(format!(
+                "{} 上没有服务在运行。\n\
+                 本机使用：先在电脑上启动 koboldcpp / Ollama / LM Studio。\n\
+                 手机上使用：不要填 127.0.0.1（那是手机自己），改填电脑的局域网地址。",
+                cfg.endpoint
+            ))
+        } else {
+            AppError::Other(format!("请求翻译服务失败：{e}"))
+        }
+    })?;
+
+    let status = resp.status().as_u16();
     if !resp.status().is_success() {
-        return Err(AppError::Other(format!(
-            "翻译服务返回 {}",
-            resp.status().as_u16()
-        )));
+        // 404 基本都是「地址填了根路径 / 模型名不对」，401 是 Key 的问题
+        let hint = match status {
+            401 | 403 => "API Key 不正确，或这个服务需要 Key 而设置里留空。",
+            404 => "路径或模型名不对。地址要写到 /v1/chat/completions，Ollama 的模型名必须是真实名字。",
+            429 => "请求太频繁被限流，稍等一下再试。",
+            500..=599 => "服务端出错了，看看推理服务的窗口里有没有报错。",
+            _ => "地址可能填错了。",
+        };
+        return Err(AppError::Other(format!("翻译服务返回 {status}。{hint}")));
     }
 
     let body = resp

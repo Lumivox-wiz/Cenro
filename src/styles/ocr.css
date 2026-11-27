@@ -149,3 +149,35 @@
 .translate-form .field-hint[data-tone="danger"] {
   color: var(--c-danger);
 }
+
+/*
+ * 「怎么配」的说明块。
+ *
+ * 用 field-hint 的字号但允许换行成块——这段有列表，压成一行会读不动。
+ * 行高比正文松一点，因为它是「要照着做」的文字，不是脚注。
+ */
+.translate-howto {
+  padding: 0 var(--sp-3) var(--sp-3);
+  line-height: 1.65;
+}
+
+.translate-howto p {
+  margin: 0 0 var(--sp-2);
+}
+
+.translate-howto ul {
+  margin: 0 0 var(--sp-2);
+  padding-left: 1.1em;
+}
+
+.translate-howto li {
+  margin-bottom: var(--sp-1);
+}
+
+.translate-howto code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--c-text-tertiary) 12%, transparent);
+  font-size: 0.95em;
+  word-break: break-all;
+}

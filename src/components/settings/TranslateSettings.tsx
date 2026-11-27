@@ -69,6 +69,32 @@ export default function TranslateSettings({ prefs, onPrefs }: SectionProps) {
         }}
       />
 
+      {/*
+       * 这段说明是给「不知道端点是什么」的人写的。
+       * 翻译在这款应用里必须外接一个模型服务——不能装作不需要，
+       * 也不能只丢一个输入框让人猜。先说清楚要准备什么，再谈填哪里。
+       */}
+      <div className="field-hint translate-howto">
+        <p>
+          翻译需要一个「模型服务」，本应用自带的是识别不是翻译。两种来源，选一种：
+        </p>
+        <ul>
+          <li>
+            <b>电脑上的本地服务</b>（不联网、文字不出本机）：装 koboldcpp 或 Ollama 并启动。
+            koboldcpp 启动后什么都不用改；Ollama 需要把地址改成{" "}
+            <code>http://127.0.0.1:11434/v1/chat/completions</code>，模型名填{" "}
+            <code>qwen2.5:7b</code> 这类真实名字。
+          </li>
+          <li>
+            <b>云端兼容接口</b>：填服务商给的地址与 API Key。注意选中的文字会离开本机。
+          </li>
+        </ul>
+        <p>
+          手机上没有本地服务可连，请填<b>电脑的局域网地址</b>（例如{" "}
+          <code>http://192.168.1.5:5001/v1/chat/completions</code>），并让电脑防火墙放行。
+        </p>
+      </div>
+
       <div className="backup-form translate-form">
         <label className="field-label" htmlFor="tr-endpoint">
           服务地址
