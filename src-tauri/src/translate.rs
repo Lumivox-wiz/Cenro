@@ -15,6 +15,10 @@ use serde_json::{json, Value};
 
 use crate::error::{AppError, Result};
 
+/// 提示词版本。**改 `build_prompt` 的措辞就必须 +1**，否则旧缓存会继续喂给用户。
+/// 缓存键里带着它，所以不需要写数据迁移。
+pub const PROMPT_VERSION: i64 = 1;
+
 /// 单次请求最多塞多少行。7B 级模型一次给太多行会开始「合并同类项」，
 /// 20 行是实测里还能保持一一对应的上限。
 const CHUNK: usize = 20;
@@ -39,6 +43,101 @@ pub struct TranslateOutcome {
     pub texts: Vec<String>,
     /// 分几批发出（排查慢的原因时有用）
     pub batches: usize,
+}
+
+/// 从端点里取一个稳定的「来源标识」写进缓存键。
+///
+/// 用 host（含端口）而不是整条 URL：路径尾部写不写斜杠不该算两个来源。
+/// 同一个端点换了模型仍是同一来源——这是有意的，模型换了译文质量变了，
+/// 但那是用户自己的选择；真要区分可以把 model 也拼进来。
+pub fn provider_id(endpoint: &str) -> String {
+    let rest = endpoint
+        .split_once("://")
+        .map(|(_, r)| r)
+        .unwrap_or(endpoint);
+    let host = rest.split('/').next().unwrap_or(rest);
+    format!("openai:{host}")
+}
+
+fn hash_text(text: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(text.as_bytes());
+    hasher
+        .finalize()
+        .iter()
+        .take(8)
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// 带缓存的一批翻译：命中就走库，未命中才发请求，回来的写进库。
+///
+/// 为什么缓存放在 Rust 而不是前端：命中率最高的场景是重复翻同一页（翻回上一页、
+/// 重开一本书），而落库是最省事的持久化；前端只负责显示。
+pub fn translate_cached(
+    conn: &rusqlite::Connection,
+    cfg: &TranslateConfig,
+    texts: &[String],
+) -> Result<TranslateOutcome> {
+    let provider = provider_id(&cfg.endpoint);
+    let mut out: Vec<Option<String>> = vec![None; texts.len()];
+    let mut misses: Vec<usize> = Vec::new();
+
+    for (i, text) in texts.iter().enumerate() {
+        let key = hash_text(text);
+        let hit: Option<String> = conn
+            .query_row(
+                "SELECT target FROM translation_cache
+                 WHERE src_hash = ?1 AND src_lang = '' AND tgt_lang = ?2
+                   AND provider = ?3 AND prompt_version = ?4",
+                rusqlite::params![key, cfg.target, provider, PROMPT_VERSION],
+                |r| r.get(0),
+            )
+            .ok();
+        match hit {
+            Some(t) if !t.is_empty() => out[i] = Some(t),
+            _ => misses.push(i),
+        }
+    }
+
+    // 只有未命中的才发请求，回来的按原位置填回去
+    if !misses.is_empty() {
+        let batch: Vec<String> = misses.iter().map(|&i| texts[i].clone()).collect();
+        let res = translate(cfg, &batch)?;
+        for (slot, &idx) in misses.iter().enumerate() {
+            let text = res.texts.get(slot).cloned().unwrap_or_default();
+            if !text.trim().is_empty() {
+                let _ = conn.execute(
+                    "INSERT INTO translation_cache
+                       (src_hash, src_lang, tgt_lang, provider, prompt_version, target, created_at)
+                     VALUES (?1, '', ?2, ?3, ?4, ?5, ?6)
+                     ON CONFLICT DO UPDATE SET target = excluded.target, created_at = excluded.created_at",
+                    rusqlite::params![
+                        hash_text(&texts[idx]),
+                        cfg.target,
+                        provider,
+                        PROMPT_VERSION,
+                        text,
+                        now_secs()
+                    ],
+                );
+            }
+            out[idx] = Some(text);
+        }
+    }
+
+    Ok(TranslateOutcome {
+        texts: out.into_iter().map(|t| t.unwrap_or_default()).collect(),
+        batches: 1,
+    })
+}
+
+fn now_secs() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
 }
 
 pub fn translate(cfg: &TranslateConfig, texts: &[String]) -> Result<TranslateOutcome> {
@@ -241,6 +340,71 @@ mod tests {
     fn truncates_extra_items() {
         let got = parse_lines(r#"["a","b","c"]"#, 2);
         assert_eq!(got, vec!["a", "b"]);
+    }
+
+    fn cfg(endpoint: &str) -> TranslateConfig {
+        TranslateConfig {
+            endpoint: endpoint.into(),
+            model: "m".into(),
+            target: "简体中文".into(),
+            api_key: String::new(),
+        }
+    }
+
+    #[test]
+    fn provider_id_is_host_only() {
+        assert_eq!(
+            provider_id("http://127.0.0.1:5001/v1/chat/completions"),
+            "openai:127.0.0.1:5001"
+        );
+        // 尾斜杠、路径不同不该算两个来源
+        assert_eq!(
+            provider_id("http://127.0.0.1:5001/v1/chat/completions/"),
+            provider_id("http://127.0.0.1:5001")
+        );
+    }
+
+    #[test]
+    fn cache_hit_skips_network() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::db::init(&conn).unwrap();
+        let c = cfg("http://127.0.0.1:5001/v1/chat/completions");
+
+        // 先手动塞一条，再用一个必然连不上的端点取——取得到就证明没发请求
+        let key = hash_text("你好");
+        conn.execute(
+            "INSERT INTO translation_cache
+               (src_hash, src_lang, tgt_lang, provider, prompt_version, target, created_at)
+             VALUES (?1, '', ?2, ?3, ?4, 'hello', 0)",
+            rusqlite::params![key, c.target, provider_id(&c.endpoint), PROMPT_VERSION],
+        )
+        .unwrap();
+
+        let dead = cfg("http://127.0.0.1:1/v1/chat/completions");
+        // 来源不同 → 不该命中，会去连 1 端口并失败
+        assert!(translate_cached(&conn, &dead, &["你好".into()]).is_err());
+
+        // 同来源 → 命中缓存
+        let got = translate_cached(&conn, &c, &["你好".into()]).unwrap();
+        assert_eq!(got.texts, vec!["hello"]);
+    }
+
+    #[test]
+    fn prompt_version_participates_in_key() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::db::init(&conn).unwrap();
+        let c = cfg("http://127.0.0.1:5001/v1/chat/completions");
+        conn.execute(
+            "INSERT INTO translation_cache
+               (src_hash, src_lang, tgt_lang, provider, prompt_version, target, created_at)
+             VALUES (?1, '', ?2, ?3, 0, 'old', 0)",
+            rusqlite::params![hash_text("你好"), c.target, provider_id(&c.endpoint)],
+        )
+        .unwrap();
+
+        // 当前 PROMPT_VERSION 是 1，版本 0 的旧条目不该被用上
+        let dead = cfg("http://127.0.0.1:1/v1/chat/completions");
+        assert!(translate_cached(&conn, &dead, &["你好".into()]).is_err());
     }
 
     #[test]

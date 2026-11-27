@@ -2284,10 +2284,13 @@ pub fn ocr_blocks(
 /// 批量翻译（OpenAI 兼容端点）。CSP 不放行外网，所以必须走后端。
 #[tauri::command]
 pub fn translate_texts(
+    state: State<'_, AppState>,
     texts: Vec<String>,
     config: crate::translate::TranslateConfig,
 ) -> Result<crate::translate::TranslateOutcome> {
-    crate::translate::translate(&config, &texts)
+    // 缓存命中就不发请求：翻回上一页、重开一本书是最高频的场景
+    let conn = state.db.lock().map_err(|_| AppError::Other("数据库忙".into()))?;
+    crate::translate::translate_cached(&conn, &config, &texts)
 }
 
 #[tauri::command]

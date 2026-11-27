@@ -97,6 +97,20 @@ CREATE TABLE IF NOT EXISTS ocr_jobs (
   updated_at INTEGER NOT NULL
 );
 
+-- 译文缓存。键里必须带「引擎 + 语言对 + 提示词版本」三样：
+-- 只按原文缓存的话，用户换了模型仍会命中旧译文（Calibre 的坑）。
+-- prompt_version 变大时旧条目自然失效，不必写迁移。
+CREATE TABLE IF NOT EXISTS translation_cache (
+  src_hash       TEXT NOT NULL,      -- 原文的 sha256（取前 16 位十六进制）
+  src_lang       TEXT NOT NULL,
+  tgt_lang       TEXT NOT NULL,
+  provider       TEXT NOT NULL,      -- openai:<host>，同一端点换模型也算不同来源
+  prompt_version INTEGER NOT NULL,
+  target         TEXT NOT NULL,
+  created_at     INTEGER NOT NULL,
+  PRIMARY KEY (src_hash, src_lang, tgt_lang, provider, prompt_version)
+);
+
 CREATE TABLE IF NOT EXISTS library_roots (
   id       INTEGER PRIMARY KEY AUTOINCREMENT,
   path     TEXT NOT NULL UNIQUE,
