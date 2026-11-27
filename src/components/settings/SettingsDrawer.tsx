@@ -6,6 +6,7 @@ import {
   Image as ImageIcon,
   Info,
   Keyboard,
+  Languages,
   Library,
   Lock,
   Palette,
@@ -28,6 +29,7 @@ import LibrarySettings from "./LibrarySettings";
 import ReadingSettings, { READING_RESET } from "./ReadingSettings";
 import ShortcutsSettings from "./ShortcutsSettings";
 import ThemeSettings, { THEME_RESET } from "./ThemeSettings";
+import TranslateSettings, { TRANSLATE_RESET } from "./TranslateSettings";
 import { THEME_OPTIONS, optionLabel } from "./shared";
 import type { GroupId } from "./shared";
 
@@ -59,6 +61,7 @@ const GROUPS: { id: GroupId; label: string; icon: LucideIcon }[] = [
   { id: "background", label: "背景", icon: ImageIcon },
   { id: "library", label: "书库", icon: Library },
   { id: "backup", label: "备份", icon: CloudUpload },
+  { id: "translate", label: "翻译", icon: Languages },
   { id: "privacy", label: "隐私", icon: Lock },
   { id: "shortcuts", label: "快捷键", icon: Keyboard },
   { id: "about", label: "关于", icon: Info },
@@ -76,6 +79,7 @@ const RESET_PATCH: Partial<Record<GroupId, Partial<Prefs>>> = {
   reading: READING_RESET,
   theme: THEME_RESET,
   background: BACKGROUND_RESET,
+  translate: TRANSLATE_RESET,
 };
 
 /**
@@ -210,6 +214,13 @@ export default function SettingsDrawer({
         return prefs.background.path ? "已设置" : "未设置";
       case "library":
         return roots.length === 0 ? "未添加" : `${roots.length} 个目录`;
+      case "translate": {
+        // 只报「配没配」：把一长串 URL 塞进一行摘要，扫读时也看不出什么
+        const configured =
+          prefs.translateEndpoint &&
+          prefs.translateEndpoint !== "http://127.0.0.1:5001/v1/chat/completions";
+        return configured ? "自定义" : "本机默认";
+      }
       case "about":
         return version ? `v${version}` : "";
       default:
@@ -330,6 +341,7 @@ export default function SettingsDrawer({
                     onOpenShelf={onOpenPrivateShelf}
                   />
                 )}
+                {page === "translate" && <TranslateSettings prefs={prefs} onPrefs={onPrefs} />}
                 {page === "shortcuts" && <ShortcutsSettings />}
                 {page === "about" && (
                   <AboutSettings version={version} onNavigate={open} />

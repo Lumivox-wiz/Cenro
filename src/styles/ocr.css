@@ -135,3 +135,17 @@
 .comic-spread {
   position: relative;
 }
+
+/*
+ * 「测试连接」的结果。
+ *
+ * 失败和成功都用 .field-hint（12px 三级灰）时，两句话看起来一模一样——
+ * 用户得读完才知道是成了还是挂了。成功走 success 色，失败走 danger 色。
+ */
+.translate-form .field-hint[data-tone="ok"] {
+  color: var(--c-success);
+}
+
+.translate-form .field-hint[data-tone="danger"] {
+  color: var(--c-danger);
+}

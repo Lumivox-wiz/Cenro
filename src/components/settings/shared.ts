@@ -7,6 +7,7 @@ export type GroupId =
   | "background"
   | "library"
   | "backup"
+  | "translate"
   | "privacy"
   | "shortcuts"
   | "about";

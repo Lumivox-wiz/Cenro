@@ -10,6 +10,7 @@
  *    前端直连会被 CSP 的 connect-src 拦掉，改 CSP 等于开一个任意出网的口子。
  */
 import { invoke } from "@tauri-apps/api/core";
+import { DEFAULT_PREFS, loadPrefs } from "./prefs";
 
 export type TranslateConfig = {
   endpoint: string;
@@ -18,36 +19,34 @@ export type TranslateConfig = {
   apiKey: string;
 };
 
-const KEY = "cenro.translate";
-
-/** 默认指向 koboldcpp 的默认端口：本机起过推理服务的人不用填任何东西 */
+/**
+ * 配置就住在 `Prefs` 里（和字号、主题同一套存储与「恢复默认」），
+ * 不再单独开一个 localStorage 键——两处存同一件事，迟早对不上。
+ */
 export const DEFAULT_CONFIG: TranslateConfig = {
-  endpoint: "http://127.0.0.1:5001/v1/chat/completions",
-  model: "local",
-  target: "简体中文",
-  apiKey: "",
+  endpoint: DEFAULT_PREFS.translateEndpoint,
+  model: DEFAULT_PREFS.translateModel,
+  target: DEFAULT_PREFS.translateTarget,
+  apiKey: DEFAULT_PREFS.translateApiKey,
 };
 
 export function loadConfig(): TranslateConfig {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return { ...DEFAULT_CONFIG };
-    const parsed = JSON.parse(raw) as Partial<TranslateConfig>;
-    return { ...DEFAULT_CONFIG, ...parsed };
-  } catch {
-    return { ...DEFAULT_CONFIG };
-  }
-}
-
-export function saveConfig(cfg: TranslateConfig): void {
-  localStorage.setItem(KEY, JSON.stringify(cfg));
+  const p = loadPrefs();
+  return {
+    endpoint: p.translateEndpoint || DEFAULT_CONFIG.endpoint,
+    model: p.translateModel || DEFAULT_CONFIG.model,
+    target: p.translateTarget || DEFAULT_CONFIG.target,
+    apiKey: p.translateApiKey ?? "",
+  };
 }
 
 export type TranslateOutcome = { texts: string[]; batches: number };
 
 /** 一批译文。返回与输入等长，空字符串表示模型没给这一行（前端退回原文）。 */
-export async function translateBatch(texts: string[]): Promise<TranslateOutcome> {
-  const cfg = loadConfig();
+export async function translateBatch(
+  texts: string[],
+  cfg: TranslateConfig = loadConfig(),
+): Promise<TranslateOutcome> {
   return invoke<TranslateOutcome>("translate_texts", {
     texts,
     config: {

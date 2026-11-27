@@ -127,6 +127,19 @@ export interface Prefs {
   monet: MonetSetting;
   /** 表面材质（v1.13）：flat 标准 / liquid 液态玻璃 */
   material: SurfaceMaterial;
+  /**
+   * 翻译服务：OpenAI 兼容端点。默认指向本机 5001 端口（koboldcpp 的默认口）。
+   *
+   * 不做成「厂商」下拉：本地推理服务五花八门，但几乎都兼容
+   * `/v1/chat/completions`。填一个地址比维护一张厂商表可靠。
+   */
+  translateEndpoint: string;
+  /** 模型名。本地服务多半忽略它，但协议要求带上 */
+  translateModel: string;
+  /** 目标语言，直接写进提示词 */
+  translateTarget: string;
+  /** 可选 Bearer；本地服务留空即可 */
+  translateApiKey: string;
 }
 
 const KEY = "reader.prefs.v1";
@@ -166,6 +179,10 @@ export const DEFAULT_PREFS: Prefs = {
     coverage: 0,
   },
   material: "flat",
+  translateEndpoint: "http://127.0.0.1:5001/v1/chat/completions",
+  translateModel: "local",
+  translateTarget: "简体中文",
+  translateApiKey: "",
 };
 
 export function loadPrefs(): Prefs {
